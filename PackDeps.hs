@@ -63,7 +63,7 @@ getFeed2R needle = do
         }
 
 getFeed3R :: String -> String -> String -> String -> Handler ()
-getFeed3R _ _ package _ =
+getFeed3R _ package _ _ =
     redirectString RedirectPermanent
   $ "http://hackage.haskell.org/cgi-bin/hackage-scripts/package/" ++ package
 

@@ -29,36 +29,31 @@ loadNewest :: FilePath -> IO Newest
 loadNewest db = foldl' addPackage Map.empty
               . entriesToList . Tar.read <$> L.readFile db
 
-filterPackages :: String -> Newest -> [GenericPackageDescription]
+filterPackages :: String -> Newest -> [DescInfo]
 filterPackages needle =
     mapMaybe go . Map.elems
   where
     needle' = map toLower needle
     go PackInfo { piDesc = Just desc } =
-        let d = packageDescription desc
-            a = author d
-            m = maintainer d
-            n = show $ package d
-            haystack = map toLower $ a ++ m ++ n
-         in if needle' `isInfixOf` haystack
-                then Just desc
-                else Nothing
+        if needle' `isInfixOf` diHaystack desc
+            then Just desc
+            else Nothing
     go _ = Nothing
 
 data CheckDeps = AllNewest
                | WontAccept [(String, String)] UTCTime
     deriving Show
 
-checkDeps :: Newest -> GenericPackageDescription
+checkDeps :: Newest -> DescInfo
           -> (PackageName, Version, CheckDeps)
 checkDeps newest desc =
-    case mapMaybe (notNewest newest) $ getDeps desc of
+    case mapMaybe (notNewest newest) $ diDeps desc of
         [] -> (name, version, AllNewest)
         x -> let y = map head $ group $ sort $ map fst x
                  et = maximum $ map snd x
               in (name, version, WontAccept y $ epochToTime et)
   where
-    PackageIdentifier name version = package $ packageDescription desc
+    PackageIdentifier name version = diPackage desc
 
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
@@ -79,10 +74,26 @@ entriesToList (Tar.Next e es) = e : entriesToList es
 
 data PackInfo = PackInfo
     { piVersion :: Version
-    , piDesc :: Maybe GenericPackageDescription
+    , piDesc :: Maybe DescInfo
     , piEpoch :: Tar.EpochTime
     }
 type Newest = Map.Map String PackInfo
+
+data DescInfo = DescInfo
+    { diHaystack :: String
+    , diDeps :: [Dependency]
+    , diPackage :: PackageIdentifier
+    }
+
+getDescInfo :: GenericPackageDescription -> DescInfo
+getDescInfo gpd = DescInfo
+    { diHaystack = map toLower $ author p ++ maintainer p ++ name
+    , diDeps = getDeps gpd
+    , diPackage = pi
+    }
+  where
+    p = packageDescription gpd
+    pi@(PackageIdentifier (PackageName name) _) = package p
 
 addPackage :: Newest -> Tar.Entry -> Newest
 addPackage m entry =
@@ -109,7 +120,7 @@ addPackage m entry =
                             _ -> Nothing
                  in Map.insert package' PackInfo
                         { piVersion = version
-                        , piDesc = p
+                        , piDesc = fmap getDescInfo p
                         , piEpoch = Tar.entryTime entry
                         } m
             _ -> m
