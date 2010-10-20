@@ -54,18 +54,60 @@ input[type=text]
     %a!href="http://docs.yesodweb.com/" Powered by Yesod
 |]
 
-getFeedR :: Handler ()
-getFeedR = do
-    needle <- runFormGet' $ stringInput "needle"
-    redirect RedirectPermanent $ Feed2R needle
-
-getFeed2R needle = do
+getDeps needle = do
     PD newest <- getYesod
     let descs = filterPackages needle newest
         go (_, _, AllNewest) = Nothing
-        go (x, v, WontAccept y z) = Just ((x, v), (y, z))
+        go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
              $ mapMaybe (go . checkDeps newest) descs
+    return deps
+
+getFeedR :: Handler RepHtml
+getFeedR = do
+    needle <- runFormGet' $ stringInput "needle"
+    deps <- getDeps needle
+    let title = "Newer dependencies for " ++ needle
+    defaultLayout $ do
+        setTitle $ string title
+        addStyle [$cassius|
+body
+    font-family: Arial,Helvetica,sans-serif
+    width: 600px
+    margin: 2em auto
+h1
+    text-align: center
+p
+    text-align: justify
+table
+    border-collapse: collapse
+th, td
+    border: 1px solid #999
+    padding: 5px
+h3
+    margin: 20px 0 5px 0
+|]
+        [$hamlet|
+%h1 $title$
+%p
+    The following are the packages which have restrictive upper bounds. You can also $
+    %a!href=@Feed2R.needle@ view this information as a news feed
+    \ so you can get automatic updates in your feed reader of choice.
+$if null.deps
+    %p
+        %b All upper bounds are non-restrictive.
+$else
+    $forall deps d
+        %h3 $fst.fst.d$-$display.snd.fst.d$
+        %table
+            $forall fst.snd.d p
+                %tr
+                    %th $fst.p$
+                    %td $snd.p$
+|]
+
+getFeed2R needle = do
+    deps <- getDeps needle
     now <- liftIO getCurrentTime
     atomFeed AtomFeed
         { atomTitle = "Newer dependencies for " ++ needle
@@ -75,7 +117,7 @@ getFeed2R needle = do
         , atomEntries = map go' deps
         }
   where
-    go' ((PackageName name, version), (deps, time)) = AtomFeedEntry
+    go' ((name, version), (deps, time)) = AtomFeedEntry
         { atomEntryLink = Feed3R needle name (display version) (show time)
         , atomEntryUpdated = time
         , atomEntryTitle = "Outdated dependencies for " ++ name ++ " " ++ display version
