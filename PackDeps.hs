@@ -7,6 +7,7 @@ import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Time
 import Distribution.Package
+import Distribution.Text
 
 data PD = PD Newest
 type Handler = GHandler PD PD
@@ -14,7 +15,7 @@ mkYesod "PD" [$parseRoutes|
 / RootR GET
 /feed FeedR GET
 /feed/#String Feed2R GET
-/feed/#String/#String/#String Feed3R GET
+/feed/#String/#String/#String/#String Feed3R GET
 |]
 instance Yesod PD where approot _ = ""
 
@@ -35,8 +36,8 @@ getFeedR = do
 getFeed2R needle = do
     PD newest <- getYesod
     let descs = filterPackages needle newest
-        go (_, AllNewest) = Nothing
-        go (x, WontAccept y z) = Just (x, (y, z))
+        go (_, _, AllNewest) = Nothing
+        go (x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
              $ mapMaybe (go . checkDeps newest) descs
     now <- liftIO getCurrentTime
@@ -48,10 +49,10 @@ getFeed2R needle = do
         , atomEntries = map go' deps
         }
   where
-    go' (PackageName name, (deps, time)) = AtomFeedEntry
-        { atomEntryLink = Feed3R needle name (show time)
+    go' ((PackageName name, version), (deps, time)) = AtomFeedEntry
+        { atomEntryLink = Feed3R needle name (display version) (show time)
         , atomEntryUpdated = time
-        , atomEntryTitle = "Outdated dependencies for " ++ name
+        , atomEntryTitle = "Outdated dependencies for " ++ name ++ " " ++ display version
         , atomEntryContent = [$hamlet|
 %table!border=1
     $forall deps d
@@ -61,8 +62,8 @@ getFeed2R needle = do
 |]
         }
 
-getFeed3R :: String -> String -> String -> Handler ()
-getFeed3R _ package _ =
+getFeed3R :: String -> String -> String -> String -> Handler ()
+getFeed3R _ _ package _ =
     redirectString RedirectPermanent
   $ "http://hackage.haskell.org/cgi-bin/hackage-scripts/package/" ++ package
 

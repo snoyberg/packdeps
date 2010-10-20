@@ -49,15 +49,16 @@ data CheckDeps = AllNewest
                | WontAccept [(String, String)] UTCTime
     deriving Show
 
-checkDeps :: Newest -> GenericPackageDescription -> (PackageName, CheckDeps)
+checkDeps :: Newest -> GenericPackageDescription
+          -> (PackageName, Version, CheckDeps)
 checkDeps newest desc =
     case mapMaybe (notNewest newest) $ getDeps desc of
-        [] -> (name, AllNewest)
+        [] -> (name, version, AllNewest)
         x -> let y = map head $ group $ sort $ map fst x
                  et = maximum $ map snd x
-              in (name, WontAccept y $ epochToTime et)
+              in (name, version, WontAccept y $ epochToTime et)
   where
-    PackageIdentifier name _ = package $ packageDescription desc
+    PackageIdentifier name version = package $ packageDescription desc
 
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
