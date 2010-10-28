@@ -21,7 +21,7 @@ instance Yesod PD where approot _ = ""
 
 getRootR = defaultLayout $ do
     setTitle "Hackage dependency monitor"
-    addStyle [$cassius|
+    addCassius [$cassius|
 body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
@@ -70,7 +70,7 @@ getFeedR = do
     let title = "Newer dependencies for " ++ needle
     defaultLayout $ do
         setTitle $ string title
-        addStyle [$cassius|
+        addCassius [$cassius|
 body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
