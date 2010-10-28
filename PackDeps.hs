@@ -136,5 +136,5 @@ getFeed3R _ package _ _ =
   $ "http://hackage.haskell.org/cgi-bin/hackage-scripts/package/" ++ package
 
 main = do
-    newest <- loadNewest "/home/snoyman/.cabal/packages/hackage.haskell.org/00-index.tar"
+    newest <- read `fmap` readFile "newest"
     basicHandler 3000 $ PD newest

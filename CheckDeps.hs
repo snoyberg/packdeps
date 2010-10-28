@@ -77,6 +77,7 @@ data PackInfo = PackInfo
     , piDesc :: Maybe DescInfo
     , piEpoch :: Tar.EpochTime
     }
+    deriving (Show, Read)
 type Newest = Map.Map String PackInfo
 
 data DescInfo = DescInfo
@@ -84,6 +85,7 @@ data DescInfo = DescInfo
     , diDeps :: [Dependency]
     , diPackage :: PackageIdentifier
     }
+    deriving (Show, Read)
 
 getDescInfo :: GenericPackageDescription -> DescInfo
 getDescInfo gpd = DescInfo
