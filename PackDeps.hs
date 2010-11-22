@@ -90,11 +90,13 @@ th, td
 h3
     margin: 20px 0 5px 0
 |]
+        let feedR = Feed2R needle
+        atomLink feedR title
         [$hamlet|
 %h1 $title$
 %p
     The following are the packages which have restrictive upper bounds. You can also $
-    %a!href=@Feed2R.needle@ view this information as a news feed
+    %a!href=@feedR@ view this information as a news feed
     \ so you can get automatic updates in your feed reader of choice.
 $if null.deps
     %p
@@ -171,11 +173,13 @@ th, td
 h3
     margin: 20px 0 5px 0
 |]
+        let feedR = SpecificFeedR $ unwords packages'
+        atomLink feedR title
         [$hamlet|
 %h1 $title$
 %p
     The following are the packages which have restrictive upper bounds. You can also $
-    %a!href=@SpecificFeedR.unwords.packages'@ view this information as a news feed
+    %a!href=@feedR@ view this information as a news feed
     \ so you can get automatic updates in your feed reader of choice.
 $forall packages p
     $maybe snd.p descinfo
