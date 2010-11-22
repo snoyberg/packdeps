@@ -104,7 +104,7 @@ getDescInfo gpd = DescInfo
 addPackage :: Newest -> Tar.Entry -> Newest
 addPackage m entry =
     case splitOn "/" $ Tar.entryPath entry of
-        [".", package', versionS, _] ->
+        [package', versionS, _] ->
             case simpleParse versionS of
                 Just version ->
                     case Map.lookup package' m of
