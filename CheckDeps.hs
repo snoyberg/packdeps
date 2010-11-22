@@ -4,6 +4,7 @@ module CheckDeps
     , filterPackages
     , CheckDeps (..)
     , checkDeps
+    , getPackage
     ) where
 
 import Distribution.Package
@@ -39,6 +40,9 @@ filterPackages needle =
             then Just desc
             else Nothing
     go _ = Nothing
+
+getPackage :: String -> Newest -> Maybe DescInfo
+getPackage s n = Map.lookup s n >>= piDesc
 
 data CheckDeps = AllNewest
                | WontAccept [(String, String)] UTCTime

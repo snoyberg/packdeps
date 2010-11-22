@@ -8,6 +8,7 @@ import Data.Ord (comparing)
 import Data.Time
 import Distribution.Package
 import Distribution.Text
+import Control.Arrow
 
 data PD = PD Newest
 type Handler = GHandler PD PD
@@ -16,6 +17,7 @@ mkYesod "PD" [$parseRoutes|
 /feed FeedR GET
 /feed/#String Feed2R GET
 /feed/#String/#String/#String/#String Feed3R GET
+/specific SpecificR GET
 |]
 instance Yesod PD where approot _ = ""
 
@@ -138,3 +140,50 @@ getFeed3R _ package _ _ =
 main = do
     newest <- read `fmap` readFile "newest"
     basicHandler 3000 $ PD newest
+
+getSpecificR :: Handler RepHtml
+getSpecificR = do
+    packages' <- lookupGetParams "package"
+    PD newest <- getYesod
+    let packages = map (id &&& flip getPackage newest) packages'
+    let title = "Newer dependencies for your Hackage packages"
+    let checkDeps' x =
+            case checkDeps newest x of
+                (_, _, AllNewest) -> Nothing
+                (_, v, WontAccept cd _) -> Just (v, cd)
+    defaultLayout $ do
+        setTitle $ string title
+        addCassius [$cassius|
+body
+    font-family: Arial,Helvetica,sans-serif
+    width: 600px
+    margin: 2em auto
+h1
+    text-align: center
+p
+    text-align: justify
+table
+    border-collapse: collapse
+th, td
+    border: 1px solid #999
+    padding: 5px
+h3
+    margin: 20px 0 5px 0
+|]
+        [$hamlet|
+%h1 $title$
+%p The following are the packages which have restrictive upper bounds.
+$forall packages p
+    $maybe snd.p descinfo
+        $maybe checkDeps'.descinfo x
+            %h3 $fst.p$-$display.fst.x$
+            %table
+                $forall snd.x p
+                    %tr
+                        %th $fst.p$
+                        %td $snd.p$
+        $nothing
+            %h3 $fst.p$ up to date
+    $nothing
+        %p Invalid package name: $fst.p$
+|]
