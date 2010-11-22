@@ -18,6 +18,7 @@ mkYesod "PD" [$parseRoutes|
 /feed/#String Feed2R GET
 /feed/#String/#String/#String/#String Feed3R GET
 /specific SpecificR GET
+/feed/specific/#String SpecificFeedR GET
 |]
 instance Yesod PD where approot _ = ""
 
@@ -172,7 +173,10 @@ h3
 |]
         [$hamlet|
 %h1 $title$
-%p The following are the packages which have restrictive upper bounds.
+%p
+    The following are the packages which have restrictive upper bounds. You can also $
+    %a!href=@SpecificFeedR.unwords.packages'@ view this information as a news feed
+    \ so you can get automatic updates in your feed reader of choice.
 $forall packages p
     $maybe snd.p descinfo
         $maybe checkDeps'.descinfo x
@@ -187,3 +191,32 @@ $forall packages p
     $nothing
         %p Invalid package name: $fst.p$
 |]
+
+getSpecificFeedR packages' = do
+    PD newest <- getYesod
+    let descs = mapMaybe (flip getPackage newest) $ words packages'
+    let go (_, _, AllNewest) = Nothing
+        go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
+        deps = reverse $ sortBy (comparing $ snd . snd)
+             $ mapMaybe (go . checkDeps newest) descs
+    now <- liftIO getCurrentTime
+    atomFeed AtomFeed
+        { atomTitle = "Newer dependencies for Hackage packages"
+        , atomLinkSelf = SpecificFeedR packages'
+        , atomLinkHome = RootR
+        , atomUpdated = now
+        , atomEntries = map go' deps
+        }
+  where
+    go' ((name, version), (deps, time)) = AtomFeedEntry
+        { atomEntryLink = Feed3R packages' name (display version) (show time)
+        , atomEntryUpdated = time
+        , atomEntryTitle = "Outdated dependencies for " ++ name ++ " " ++ display version
+        , atomEntryContent = [$hamlet|
+%table!border=1
+    $forall deps d
+        %tr
+            %th $fst.d$
+            %td $snd.d$
+|]
+        }
