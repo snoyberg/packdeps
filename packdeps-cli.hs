@@ -17,20 +17,20 @@ main = do
         case checkDeps newest di of
             (pn, v, AllNewest) ->
                 putStrLn $ concat
-                    [ prettyN pn
+                    [ unPackageName pn
                     , "-"
-                    , prettyV v
+                    , display v
                     , ": Can use newest versions of all dependencies"
                     ]
             (pn, v, WontAccept p _) -> do
                 putStrLn $ concat
-                    [ prettyN pn
+                    [ unPackageName pn
                     , "-"
-                    , prettyV v
+                    , display v
                     , ": Cannot accept the following packages"
                     ]
-                flip mapM_ p $ \(k, v) -> putStrLn $ k ++ " " ++ v
+                flip mapM_ p $ \(x, y) -> putStrLn $ x ++ " " ++ y
         putStrLn ""
 
-prettyN (PackageName n) = n
-prettyV = display
+unPackageName :: PackageName -> String
+unPackageName (PackageName n) = n

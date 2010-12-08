@@ -1,0 +1,37 @@
+name:            packdeps
+version:         0.0.0
+license:         BSD3
+license-file:    LICENSE
+author:          Michael Snoyman <michael@snoyman.com>
+maintainer:      Michael Snoyman <michael@snoyman.com>
+synopsis:        Check your cabal packages for lagging dependencies.
+description:
+    This provides a library and command line tool for checking if the upper bounds in your package's dependency list excludes the newest package available. The code was originally available only as a web interface at <http://packdeps.haskellers.com/>, but is now available for standalone use as well.
+    .
+    The command line tool has an incredibly simple interface: simply pass it a list of cabal files, and it will tell you what dependencies- if any- are restricted.
+category:        Distribution
+stability:       Stable
+cabal-version:   >= 1.6
+build-type:      Simple
+homepage:        http://packdeps.haskellers.com/
+
+library
+    build-depends:   base                      >= 4        && < 5
+                   , tar                       >= 0.3.1    && < 0.4
+                   , split                     >= 0.1.2.3  && < 0.2
+                   , bytestring                >= 0.9      && < 0.10
+                   , text                      >= 0.7      && < 0.12
+                   , Cabal                     >= 1.8      && < 1.11
+                   , time                      >= 1.1.4    && < 1.3
+                   , containers                >= 0.2      && < 0.5
+                   , directory                 >= 1.0      && < 1.2
+    exposed-modules: Distribution.PackDeps
+    ghc-options:     -Wall
+
+executable             packdeps
+    ghc-options:       -Wall
+    main-is:           packdeps-cli.hs
+
+source-repository head
+  type:     git
+  location: git://github.com/snoyberg/packdeps.git
