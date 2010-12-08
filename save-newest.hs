@@ -1,5 +1,6 @@
-import CheckDeps
+import Distribution.PackDeps
 
+main :: IO ()
 main = do
-    newest <- loadNewest "/home/snoyman/.cabal/packages/hackage.haskell.org/00-index.tar"
+    newest <- loadNewest
     writeFile "newest" $ show newest

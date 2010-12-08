@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies, OverloadedStrings #-}
 import Yesod
 import Yesod.Helpers.AtomFeed
-import CheckDeps
+import Distribution.PackDeps
 import Data.Maybe
 import Data.List (sortBy)
 import Data.Ord (comparing)
