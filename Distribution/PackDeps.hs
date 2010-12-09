@@ -18,10 +18,11 @@ module Distribution.PackDeps
     ) where
 
 import System.Directory (getAppUserDataDirectory)
+import System.FilePath ((</>))
 import qualified Data.Map as Map
-import Data.List (foldl', group, sort, isInfixOf)
+import Data.List (foldl', group, sort, isInfixOf, isPrefixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 
 import Distribution.Package
 import Distribution.PackageDescription
@@ -42,8 +43,22 @@ import qualified Codec.Archive.Tar.Entry as Tar
 loadNewest :: IO Newest
 loadNewest = do
     c <- getAppUserDataDirectory "cabal"
-    let fn = c ++ "/packages/hackage.haskell.org/00-index.tar"
-    loadNewestFrom fn
+    cfg <- readFile (c </> "config")
+    let repos        = reposFromConfig cfg
+        tarName repo = c </> "packages" </> repo </> "00-index.tar"
+    fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom . tarName) $ repos
+
+reposFromConfig :: String -> [String]
+reposFromConfig = map (takeWhile (/= ':'))
+                . catMaybes
+                . map (dropPrefix "remote-repo: ")
+                . lines
+
+dropPrefix :: (Eq a) => [a] -> [a] -> Maybe [a]
+dropPrefix prefix s =
+  if prefix `isPrefixOf` s
+  then Just . drop (length prefix) $ s
+  else Nothing
 
 loadNewestFrom :: FilePath -> IO Newest
 loadNewestFrom = fmap parseNewest . L.readFile
@@ -87,6 +102,9 @@ data PackInfo = PackInfo
     , piEpoch :: Tar.EpochTime
     }
     deriving (Show, Read)
+
+maxVersion :: PackInfo -> PackInfo -> PackInfo
+maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
 
 -- | The newest version of every package.
 type Newest = Map.Map String PackInfo
