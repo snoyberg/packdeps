@@ -52,7 +52,9 @@ input[type=text]
 %p
     All of the code is $
     %a!href="http://github.com/snoyberg/packdeps" available on Github
-    \. Most likely in the near future I'll also publish an executable on Hackage which will let you do this check against non-published packages.
+    \. Additionally, there is a $
+    %a!href="http://hackage.haskell.org/package/packdeps" package on Hackage
+    \ with the code powering this site both as a library and as an executable, so you can test code which is not uploaded to the public Hackage server.
 #footer
     %a!href="http://docs.yesodweb.com/" Powered by Yesod
 |]
