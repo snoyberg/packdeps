@@ -15,6 +15,9 @@ module Distribution.PackDeps
     , loadPackage
       -- * Get multiple packages
     , filterPackages
+      -- * Reverse dependencies
+    , Reverses
+    , getReverses
     ) where
 
 import System.Directory (getAppUserDataDirectory)
@@ -39,6 +42,11 @@ import qualified Data.ByteString.Lazy as L
 import Data.List.Split (splitOn)
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
+
+import Data.Function (on)
+import Control.Arrow ((&&&))
+import Data.List (groupBy, sortBy)
+import Data.Ord (comparing)
 
 loadNewest :: IO Newest
 loadNewest = do
@@ -108,6 +116,28 @@ maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
 
 -- | The newest version of every package.
 type Newest = Map.Map String PackInfo
+
+type Reverses = Map.Map String (Version, [(String, VersionRange)])
+
+getReverses :: Newest -> Reverses
+getReverses newest =
+    Map.fromList withVersion
+  where
+    -- dep = dependency, rel = relying package
+    toTuples (_, PackInfo { piDesc = Nothing }) = []
+    toTuples (rel, PackInfo { piDesc = Just DescInfo { diDeps = deps } }) =
+        map (toTuple rel) deps
+    toTuple rel (Dependency (PackageName dep) range) = (dep, (rel, range))
+    hoist :: Ord a => [(a, b)] -> [(a, [b])]
+    hoist = map ((fst . head) &&& map snd)
+          . groupBy ((==) `on` fst)
+          . sortBy (comparing fst)
+    hoisted = hoist $ concatMap toTuples $ Map.toList newest
+    withVersion = mapMaybe addVersion hoisted
+    addVersion (dep, rels) =
+        case Map.lookup dep newest of
+            Nothing -> Nothing
+            Just PackInfo { piVersion = v} -> Just (dep, (v, rels))
 
 -- | Information on a single package.
 data DescInfo = DescInfo

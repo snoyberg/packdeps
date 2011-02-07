@@ -9,8 +9,10 @@ import Data.Time
 import Distribution.Package
 import Distribution.Text
 import Control.Arrow
+import Distribution.Version (withinRange)
+import qualified Data.Map as Map
 
-data PD = PD Newest
+data PD = PD Newest Reverses
 type Handler = GHandler PD PD
 mkYesod "PD" [$parseRoutes|
 / RootR GET
@@ -19,6 +21,8 @@ mkYesod "PD" [$parseRoutes|
 /feed/#String/#String/#String/#String Feed3R GET
 /specific SpecificR GET
 /feed/specific/#String SpecificFeedR GET
+
+/reverse/#String ReverseR GET
 |]
 instance Yesod PD where approot _ = ""
 
@@ -60,7 +64,7 @@ input[type=text]
 |]
 
 getDeps needle = do
-    PD newest <- getYesod
+    PD newest _ <- getYesod
     let descs = filterPackages needle newest
         go (_, _, AllNewest) = Nothing
         go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
@@ -144,12 +148,12 @@ getFeed3R _ package _ _ =
 
 main = do
     newest <- read `fmap` readFile "newest"
-    basicHandler 3000 $ PD newest
+    basicHandler 3000 $ PD newest $ getReverses newest
 
 getSpecificR :: Handler RepHtml
 getSpecificR = do
     packages' <- lookupGetParams "package"
-    PD newest <- getYesod
+    PD newest _ <- getYesod
     let packages = map (id &&& flip getPackage newest) packages'
     let title = "Newer dependencies for your Hackage packages"
     let checkDeps' x =
@@ -199,7 +203,7 @@ $forall packages p
 |]
 
 getSpecificFeedR packages' = do
-    PD newest <- getYesod
+    PD newest _ <- getYesod
     let descs = mapMaybe (flip getPackage newest) $ words packages'
     let go (_, _, AllNewest) = Nothing
         go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
@@ -226,3 +230,31 @@ getSpecificFeedR packages' = do
             %td $snd.d$
 |]
         }
+
+getReverseR :: String -> Handler RepHtml
+getReverseR dep = do
+    PD _ reverse <- getYesod
+    (version, rels) <- maybe notFound return $ Map.lookup dep reverse
+    defaultLayout $ do
+        setTitle $ string $ "Reverse dependencies for " ++ dep
+        addCassius [$cassius|
+table
+    border-collapse: collapse
+th, td
+    border: 1px solid #333
+    padding: 3px
+|]
+        addHtml [$hamlet|
+%h1 Reverse dependencies for $dep$ $display version$
+%table
+    %tr
+        %th Package
+        %th Uses current version?
+    $forall rels rel
+        %tr
+            %td $fst.rel$
+            $if (withinRange version).(snd rel)
+                %td Yes
+            $else
+                %td!style="color:#900" No ($display.snd.rel$)
+|]
