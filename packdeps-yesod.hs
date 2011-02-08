@@ -17,6 +17,7 @@ import qualified Data.ByteString.Char8 as S8
 data PD = PD Newest Reverses
 type Handler = GHandler PD PD
 mkYesod "PD" [$parseRoutes|
+/favicon.ico FaviconR GET
 / RootR GET
 /feed FeedR GET
 /feed/#String Feed2R GET
@@ -28,6 +29,9 @@ mkYesod "PD" [$parseRoutes|
 /reverse/#String ReverseR GET
 |]
 instance Yesod PD where approot _ = ""
+
+getFaviconR :: Handler ()
+getFaviconR = sendFile "image/x-icon" "favicon.ico"
 
 mainCassius = [$cassius|
 body
@@ -50,6 +54,9 @@ table
     margin: 0 auto
 th, td
     border: 1px solid #333
+form p
+    margin-top: 1em
+    text-align: center
 |]
 
 getRootR = defaultLayout $ do
@@ -60,6 +67,8 @@ getRootR = defaultLayout $ do
 <form action="@{FeedR}">
     <input type="text" name="needle" required="" placeholder="Search string">
     <input type="submit" value="Check">
+    <p>
+        <a href=@{ReverseListR}>Reverse Dependency List
 <h2>What is this?
 <p>It can often get tedious to keep your package dependencies up-to-date. This tool is meant to alleviate a lot of the burden. It will automatically determine when an upper bound on a package prevents the usage of a newer version. For example, if foo depends on bar &gt;= 0.1 &amp;&amp; &lt; 0.2, and bar 0.2 exists, this tool will flag it.
 <p>Enter a search string in the box above. It will find all packages containing that string in the package name, maintainer or author fields, and create an Atom feed for restrictive bounds. Simply add that URL to a news reader, and you're good to go!
