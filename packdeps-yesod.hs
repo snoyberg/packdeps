@@ -24,13 +24,13 @@ mkYesod "PD" [$parseRoutes|
 /specific SpecificR GET
 /feed/specific/#String SpecificFeedR GET
 
+/reverse ReverseListR GET
 /reverse/#String ReverseR GET
 |]
 instance Yesod PD where approot _ = ""
 
-getRootR = defaultLayout $ do
-    setTitle "Hackage dependency monitor"
-    addCassius [$cassius|body
+mainCassius = [$cassius|
+body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
     margin: 2em auto
@@ -45,7 +45,16 @@ input[type=text]
     margin-top: 15px
     border-top: 1px dashed #999
     padding-top: 10px
+table
+    border-collapse: collapse
+    margin: 0 auto
+th, td
+    border: 1px solid #333
 |]
+
+getRootR = defaultLayout $ do
+    setTitle "Hackage dependency monitor"
+    addCassius mainCassius
     [$hamlet|\
 <h1>Hackage Dependency Monitor
 <form action="@{FeedR}">
@@ -151,7 +160,7 @@ getFeed3R _ package _ _ =
 
 main = do
     newest <- read `fmap` readFile "newest"
-    warpDebug 3000 $ PD newest $ getReverses newest
+    warpDebug 3001 $ PD newest $ getReverses newest
 
 getSpecificR :: Handler RepHtml
 getSpecificR = do
@@ -235,19 +244,44 @@ getSpecificFeedR packages' = do
 |]
         }
 
+getReverseListR :: Handler RepHtml
+getReverseListR = do
+    PD _ reverse <- getYesod
+    defaultLayout $ do
+        setTitle "Reverse Dependencies"
+        addCassius mainCassius
+        addHamlet [$hamlet|
+<h1>Reverse Dependencies
+<p>Please choose a package below to view its reverse dependencies: those packages that depend upon it. This listing will also tell you which packages are incompatible with the current version of the package.
+<table
+    <tr
+        <th>Package
+        <th>Total Dependencies
+        <th>Total Outdated Dependencies
+    $forall p <- Map.toList reverse
+        <tr>
+            <td
+                <a href=@{ReverseR $ fst p}>#{fst p}
+            <td>#{show $ length $ snd $ snd p}
+            $maybe o <- getOutdated $ snd p
+                <td style="color:#900">#{o}
+            $nothing
+                <td>0
+|]
+  where
+    getOutdated (version, pairs) =
+        case filter (not . withinRange version . snd) pairs of
+            [] -> Nothing
+            ps -> Just $ show $ length ps
+
 getReverseR :: String -> Handler RepHtml
 getReverseR dep = do
     PD _ reverse <- getYesod
     (version, rels) <- maybe notFound return $ Map.lookup dep reverse
     defaultLayout $ do
         setTitle $ string $ "Reverse dependencies for " ++ dep
-        addCassius [$cassius|table
-    border-collapse: collapse
-th, td
-    border: 1px solid #333
-    padding: 3px
-|]
-        addHtml [$hamlet|\
+        addCassius mainCassius
+        addHtml [$hamlet|
 <h1>Reverse dependencies for #{dep} #{display version}
 <table>
     <tr>
