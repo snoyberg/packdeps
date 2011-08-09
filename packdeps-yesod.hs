@@ -1,4 +1,5 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies, OverloadedStrings, MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
 import Yesod
 import Yesod.Helpers.AtomFeed
 import Yesod.Helpers.Feed
@@ -8,11 +9,13 @@ import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Time
 import Distribution.Package
-import Distribution.Text
+import Distribution.Text hiding (Text)
 import Control.Arrow
 import Distribution.Version (withinRange)
 import qualified Data.Map as Map
 import qualified Data.ByteString.Char8 as S8
+import Data.Text (Text, pack, unpack)
+import Text.Hamlet.NonPoly (html)
 
 data PD = PD Newest Reverses
 type Handler = GHandler PD PD
@@ -20,13 +23,13 @@ mkYesod "PD" [$parseRoutes|
 /favicon.ico FaviconR GET
 / RootR GET
 /feed FeedR GET
-/feed/#String Feed2R GET
-/feed/#String/#String/#String/#String Feed3R GET
+/feed/#Text Feed2R GET
+/feed/#Text/#Text/#Text/#Text Feed3R GET
 /specific SpecificR GET
-/feed/specific/#String SpecificFeedR GET
+/feed/specific/#Text SpecificFeedR GET
 
 /reverse ReverseListR GET
-/reverse/#String ReverseR GET
+/reverse/#Text ReverseR GET
 |]
 instance Yesod PD where approot _ = ""
 
@@ -94,10 +97,10 @@ getDeps needle = do
 getFeedR :: Handler RepHtml
 getFeedR = do
     needle <- runFormGet' $ stringInput "needle"
-    deps <- getDeps needle
-    let title = "Newer dependencies for " ++ needle
+    deps <- getDeps $ unpack needle
+    let title = "Newer dependencies for " ++ unpack needle
     defaultLayout $ do
-        setTitle $ string title
+        setTitle $ toHtml title
         addCassius [$cassius|body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
@@ -136,23 +139,23 @@ $else
 |]
 
 getFeed2R needle = do
-    deps <- getDeps needle
+    deps <- getDeps $ unpack needle
     now <- liftIO getCurrentTime
     newsFeed Feed
-        { feedTitle = "Newer dependencies for " ++ needle
+        { feedTitle = pack $ "Newer dependencies for " ++ unpack needle
         , feedLinkSelf = Feed2R needle
         , feedLinkHome = RootR
         , feedUpdated = now
         , feedEntries = map go' deps
         , feedLanguage = "en"
-        , feedDescription = string $ "Newer dependencies for " ++ needle
+        , feedDescription = toHtml $ "Newer dependencies for " ++ unpack needle
         }
   where
     go' ((name, version), (deps, time)) = FeedEntry
-        { feedEntryLink = Feed3R needle name (display version) (show time)
+        { feedEntryLink = Feed3R needle (pack name) (pack $ display version) (pack $ show time)
         , feedEntryUpdated = time
-        , feedEntryTitle = "Outdated dependencies for " ++ name ++ " " ++ display version
-        , feedEntryContent = [$hamlet|\
+        , feedEntryTitle = pack $ "Outdated dependencies for " ++ name ++ " " ++ display version
+        , feedEntryContent = [$hamlet|
 <table border="1">
     $forall d <- deps
         <tr>
@@ -161,28 +164,28 @@ getFeed2R needle = do
 |]
         }
 
-getFeed3R :: String -> String -> String -> String -> Handler ()
+getFeed3R :: Text -> Text -> Text -> Text -> Handler ()
 getFeed3R _ package _ _ =
-    redirectString RedirectPermanent
-  $ S8.pack
-  $ "http://hackage.haskell.org/cgi-bin/hackage-scripts/package/" ++ package
+    redirectText RedirectPermanent
+  $ pack
+  $ "http://hackage.haskell.org/package/" ++ unpack package
 
 main = do
     newest <- read `fmap` readFile "newest"
-    warpDebug 3001 $ PD newest $ getReverses newest
+    warpDebug 5005 $ PD newest $ getReverses newest
 
 getSpecificR :: Handler RepHtml
 getSpecificR = do
     packages' <- lookupGetParams "package"
     PD newest _ <- getYesod
-    let packages = map (id &&& flip getPackage newest) packages'
+    let packages = map (id &&& flip getPackage newest) $ map unpack packages'
     let title = "Newer dependencies for your Hackage packages"
     let checkDeps' x =
             case checkDeps newest x of
                 (_, _, AllNewest) -> Nothing
                 (_, v, WontAccept cd _) -> Just (v, cd)
     defaultLayout $ do
-        setTitle $ string title
+        setTitle $ toHtml title
         addCassius [$cassius|body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
@@ -199,7 +202,7 @@ th, td
 h3
     margin: 20px 0 5px 0
 |]
-        let feedR = SpecificFeedR $ unwords packages'
+        let feedR = SpecificFeedR $ pack $ unwords $ map unpack packages'
         atomLink feedR title
         [$hamlet|\
 <h1>#{title}
@@ -224,7 +227,7 @@ $forall p <- packages
 
 getSpecificFeedR packages' = do
     PD newest _ <- getYesod
-    let descs = mapMaybe (flip getPackage newest) $ words packages'
+    let descs = mapMaybe (flip getPackage newest) $ words $ unpack packages'
     let go (_, _, AllNewest) = Nothing
         go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
@@ -241,9 +244,9 @@ getSpecificFeedR packages' = do
         }
   where
     go' ((name, version), (deps, time)) = FeedEntry
-        { feedEntryLink = Feed3R packages' name (display version) (show time)
+        { feedEntryLink = Feed3R packages' (pack name) (pack $ display version) (pack $ show time)
         , feedEntryUpdated = time
-        , feedEntryTitle = "Outdated dependencies for " ++ name ++ " " ++ display version
+        , feedEntryTitle = pack $ "Outdated dependencies for " ++ name ++ " " ++ display version
         , feedEntryContent = [$hamlet|\
 <table border="1">
     $forall d <- deps
@@ -270,7 +273,7 @@ getReverseListR = do
     $forall p <- Map.toList reverse
         <tr>
             <td
-                <a href=@{ReverseR $ fst p}>#{fst p}
+                <a href=@{ReverseR $ pack $ fst p}>#{fst p}
             <td>#{show $ length $ snd $ snd p}
             $maybe o <- getOutdated $ snd p
                 <td style="color:#900">#{o}
@@ -283,12 +286,12 @@ getReverseListR = do
             [] -> Nothing
             ps -> Just $ show $ length ps
 
-getReverseR :: String -> Handler RepHtml
+getReverseR :: Text -> Handler RepHtml
 getReverseR dep = do
     PD _ reverse <- getYesod
-    (version, rels) <- maybe notFound return $ Map.lookup dep reverse
+    (version, rels) <- maybe notFound return $ Map.lookup (unpack dep) reverse
     defaultLayout $ do
-        setTitle $ string $ "Reverse dependencies for " ++ dep
+        setTitle [html|Reverse dependencies for #{dep}|]
         addCassius mainCassius
         addHtml [$hamlet|
 <h1>Reverse dependencies for #{dep} #{display version}
