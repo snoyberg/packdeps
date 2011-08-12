@@ -301,7 +301,8 @@ getReverseR dep = do
         <th>Uses current version?
     $forall rel <- rels
         <tr>
-            <td>#{fst rel}
+            <td
+                <a href=@{ReverseR $ pack $ fst rel}>#{fst rel}
             $if withinRange version (snd rel)
                 <td>Yes
             $else
