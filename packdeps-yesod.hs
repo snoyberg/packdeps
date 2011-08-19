@@ -293,7 +293,7 @@ getReverseR dep = do
     defaultLayout $ do
         setTitle [html|Reverse dependencies for #{dep}|]
         addCassius mainCassius
-        addHtml [$hamlet|
+        addHamlet [$hamlet|
 <h1>Reverse dependencies for #{dep} #{display version}
 <table>
     <tr>
