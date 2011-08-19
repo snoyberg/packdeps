@@ -1,8 +1,8 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies, OverloadedStrings, MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 import Yesod
-import Yesod.Helpers.AtomFeed
-import Yesod.Helpers.Feed
+import Yesod.AtomFeed
+import Yesod.Feed
 import Distribution.PackDeps
 import Data.Maybe
 import Data.List (sortBy)
@@ -15,7 +15,7 @@ import Distribution.Version (withinRange)
 import qualified Data.Map as Map
 import qualified Data.ByteString.Char8 as S8
 import Data.Text (Text, pack, unpack)
-import Text.Hamlet.NonPoly (html)
+import Text.Hamlet (shamlet)
 
 data PD = PD Newest Reverses
 type Handler = GHandler PD PD
@@ -65,7 +65,7 @@ form p
 getRootR = defaultLayout $ do
     setTitle "Hackage dependency monitor"
     addCassius mainCassius
-    [$hamlet|\
+    [whamlet|
 <h1>Hackage Dependency Monitor
 <form action="@{FeedR}">
     <input type="text" name="needle" required="" placeholder="Search string">
@@ -94,9 +94,12 @@ getDeps needle = do
              $ mapMaybe (go . checkDeps newest) descs
     return deps
 
+instance RenderMessage PD FormMessage where
+    renderMessage _ _ = defaultFormMessage
+
 getFeedR :: Handler RepHtml
 getFeedR = do
-    needle <- runFormGet' $ stringInput "needle"
+    needle <- runInputGet $ ireq textField "needle"
     deps <- getDeps $ unpack needle
     let title = "Newer dependencies for " ++ unpack needle
     defaultLayout $ do
@@ -119,10 +122,10 @@ h3
 |]
         let feedR = Feed2R needle
         atomLink feedR title
-        [$hamlet|\
+        [whamlet|
 <h1>#{title}
 <p>
-    \The following are the packages which have restrictive upper bounds. You can also 
+    \The following are the packages which have restrictive upper bounds. You can also #
     <a href="@{feedR}">view this information as a news feed
     \ so you can get automatic updates in your feed reader of choice.
 $if null deps
@@ -155,7 +158,7 @@ getFeed2R needle = do
         { feedEntryLink = Feed3R needle (pack name) (pack $ display version) (pack $ show time)
         , feedEntryUpdated = time
         , feedEntryTitle = pack $ "Outdated dependencies for " ++ name ++ " " ++ display version
-        , feedEntryContent = [$hamlet|
+        , feedEntryContent = [shamlet|
 <table border="1">
     $forall d <- deps
         <tr>
@@ -204,10 +207,10 @@ h3
 |]
         let feedR = SpecificFeedR $ pack $ unwords $ map unpack packages'
         atomLink feedR title
-        [$hamlet|\
+        [whamlet|
 <h1>#{title}
 <p>
-    \The following are the packages which have restrictive upper bounds. You can also 
+    The following are the packages which have restrictive upper bounds. You can also #
     <a href="@{feedR}">view this information as a news feed
     \ so you can get automatic updates in your feed reader of choice.
 $forall p <- packages
@@ -247,7 +250,7 @@ getSpecificFeedR packages' = do
         { feedEntryLink = Feed3R packages' (pack name) (pack $ display version) (pack $ show time)
         , feedEntryUpdated = time
         , feedEntryTitle = pack $ "Outdated dependencies for " ++ name ++ " " ++ display version
-        , feedEntryContent = [$hamlet|\
+        , feedEntryContent = [shamlet|
 <table border="1">
     $forall d <- deps
         <tr>
@@ -291,9 +294,9 @@ getReverseR dep = do
     PD _ reverse <- getYesod
     (version, rels) <- maybe notFound return $ Map.lookup (unpack dep) reverse
     defaultLayout $ do
-        setTitle [html|Reverse dependencies for #{dep}|]
+        setTitle [shamlet|Reverse dependencies for #{dep}|]
         addCassius mainCassius
-        addHamlet [$hamlet|
+        addHamlet [hamlet|
 <h1>Reverse dependencies for #{dep} #{display version}
 <table>
     <tr>

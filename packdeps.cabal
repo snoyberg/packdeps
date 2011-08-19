@@ -50,9 +50,9 @@ executable             save-newest
         Buildable: False
     ghc-options:       -Wall
     main-is:           save-newest.hs
-    build-depends:     yesod-newsfeed         == 0.1.*
-                     , yesod                  == 0.8.*
-                     , hamlet                 == 0.8.*
+    build-depends:     yesod-newsfeed         == 0.3.*
+                     , yesod                  == 0.9.*
+                     , hamlet                 == 0.10.*
 
 source-repository head
   type:     git
