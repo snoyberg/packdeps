@@ -297,17 +297,19 @@ getReverseR dep = do
         setTitle [shamlet|Reverse dependencies for #{dep}|]
         addCassius mainCassius
         addHamlet [hamlet|
-<h1>Reverse dependencies for #{dep} #{display version}
+<h1>#{show $ length rels} reverse dependencies for #{dep}-#{display version}
 <table>
     <tr>
         <th>Package
         <th>Uses current version?
     $forall rel <- rels
         <tr>
-            <td
-                <a href=@{ReverseR $ pack $ fst rel}>#{fst rel}
-            $if withinRange version (snd rel)
-                <td>Yes
+            $if Map.member (fst rel) reverse
+                <td><a href=@{ReverseR $ pack $ fst rel}>#{fst rel}
             $else
-                <td style="color:#900">No (#{display (snd rel)})
+                <td>#{fst rel}
+            $if withinRange version (snd rel)
+                <td>#{display (snd rel)}
+            $else
+                <td style="background-color:#fbb">#{display (snd rel)}
 |]
