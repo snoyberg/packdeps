@@ -18,7 +18,6 @@ import Data.Text (Text, pack, unpack)
 import Text.Hamlet (shamlet)
 
 data PD = PD Newest Reverses
-type Handler = GHandler PD PD
 mkYesod "PD" [$parseRoutes|
 /favicon.ico FaviconR GET
 / RootR GET
