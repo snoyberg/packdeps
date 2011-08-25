@@ -296,7 +296,7 @@ getReverseR dep = do
         setTitle [shamlet|Reverse dependencies for #{dep}|]
         addCassius mainCassius
         addHamlet [hamlet|
-<h1>#{show $ length rels} reverse dependencies for #{dep}-#{display version}
+<h1>#{show $ length rels} reverse dependencies for #{dep}&nbsp#{display version}
 <table>
     <tr>
         <th>Package
