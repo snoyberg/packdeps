@@ -81,7 +81,7 @@ entriesToList (Tar.Next e es) = e : entriesToList es
 
 addPackage :: Newest -> Tar.Entry -> Newest
 addPackage m entry =
-    case splitOn "/" $ Tar.entryPath entry of
+    case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
         [package', versionS, _] ->
             case simpleParse versionS of
                 Just version ->
