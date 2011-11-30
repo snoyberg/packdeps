@@ -16,6 +16,7 @@ import qualified Data.Map as Map
 import qualified Data.ByteString.Char8 as S8
 import Data.Text (Text, pack, unpack)
 import Text.Hamlet (shamlet)
+import System.Environment (getArgs)
 
 data PD = PD Newest Reverses
 mkYesod "PD" [$parseRoutes|
@@ -173,8 +174,14 @@ getFeed3R _ package _ _ =
   $ "http://hackage.haskell.org/package/" ++ unpack package
 
 main = do
-    newest <- read `fmap` readFile "newest"
-    warpDebug 5005 $ PD newest $ getReverses newest
+    args <- getArgs
+    if args == ["--save-newest"]
+        then do
+            newest <- loadNewest
+            writeFile "newest" $ show newest
+        else do
+            newest <- read `fmap` readFile "newest"
+            warpDebug 5005 $ PD newest $ getReverses newest
 
 getSpecificR :: Handler RepHtml
 getSpecificR = do

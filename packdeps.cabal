@@ -65,19 +65,6 @@ executable             packdeps-yesod
     else
         Buildable: False
 
-executable             save-newest
-    main-is:           save-newest.hs
-    hs-source-dirs:    tools
-
-    build-depends:   base                      >= 4        && < 5
-
-    if flag(web)
-        ghc-options:       -Wall
-        build-depends:     base
-                         , packdeps
-    else
-        Buildable: False
-
 source-repository head
   type:     git
   location: git://github.com/snoyberg/packdeps.git
