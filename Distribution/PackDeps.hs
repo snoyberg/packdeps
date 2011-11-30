@@ -144,6 +144,7 @@ data DescInfo = DescInfo
     { diHaystack :: String
     , diDeps :: [Dependency]
     , diPackage :: PackageIdentifier
+    , diSynopsis :: String
     }
     deriving (Show, Read)
 
@@ -152,6 +153,7 @@ getDescInfo gpd = DescInfo
     { diHaystack = map toLower $ author p ++ maintainer p ++ name
     , diDeps = getDeps gpd
     , diPackage = pi'
+    , diSynopsis = synopsis p
     }
   where
     p = packageDescription gpd
@@ -216,7 +218,8 @@ filterPackages needle =
   where
     needle' = map toLower needle
     go PackInfo { piDesc = Just desc } =
-        if needle' `isInfixOf` diHaystack desc
+        if needle' `isInfixOf` diHaystack desc &&
+           not ("(deprecated)" `isInfixOf` diSynopsis desc)
             then Just desc
             else Nothing
     go _ = Nothing
