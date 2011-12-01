@@ -96,7 +96,7 @@ getDeps deep needle = do
         go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
              $ mapMaybe (go . checkDeps newest) descs
-    return deps
+    return (descs, deps)
 
 instance RenderMessage PD FormMessage where
     renderMessage _ _ = defaultFormMessage
@@ -105,7 +105,7 @@ getFeedR :: Handler RepHtml
 getFeedR = do
     needle <- runInputGet $ ireq textField "needle"
     deep <- isDeep
-    deps <- getDeps deep $ unpack needle
+    (descs, deps) <- getDeps deep $ unpack needle
     let title = "Newer dependencies for " ++ unpack needle
     let deepR = (FeedR, [("needle", needle), ("deep", "on")])
     defaultLayout $ do
@@ -148,14 +148,20 @@ $else
 $if not deep
     <p>
         <a href=@?{deepR}>View outdated dependency for all ancestor packages too.
+<h3>Packages checked
+<ul>
+    $forall desc <- descs
+        <li>
+            $with name <- diName desc
+                <a href="http://hackage.haskell.org/package/#{name}">#{name}
 |]
 
 getFeed2R needle = do
-    deps <- getDeps False $ unpack needle
+    (_, deps) <- getDeps False $ unpack needle
     feed2Helper needle deps
 
 getFeed2DeepR needle = do
-    deps <- getDeps True $ unpack needle
+    (_, deps) <- getDeps True $ unpack needle
     feed2Helper needle deps
 
 feed2Helper needle deps = do
