@@ -85,9 +85,13 @@ getRootR = defaultLayout $ do
     <a href="http://docs.yesodweb.com/">Powered by Yesod
 |]
 
+isDeep = fmap (== Just "on") $ runInputGet $ iopt textField "deep"
+
 getDeps needle = do
     PD newest _ <- getYesod
-    let descs = filterPackages needle newest
+    deep <- isDeep
+    let descs' = filterPackages needle newest
+        descs = if deep then deepDeps newest descs' else descs'
         go (_, _, AllNewest) = Nothing
         go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
@@ -100,8 +104,10 @@ instance RenderMessage PD FormMessage where
 getFeedR :: Handler RepHtml
 getFeedR = do
     needle <- runInputGet $ ireq textField "needle"
+    deep <- isDeep
     deps <- getDeps $ unpack needle
     let title = "Newer dependencies for " ++ unpack needle
+    let deepR = (FeedR, [("needle", needle), ("deep", "on")])
     defaultLayout $ do
         setTitle $ toHtml title
         addCassius [$cassius|body
@@ -139,6 +145,9 @@ $else
                 <tr>
                     <th>#{fst p}
                     <td>#{snd p}
+$if not deep
+    <p>
+        <a href=@?{deepR}>View outdated dependency for all ancestor packages too.
 |]
 
 getFeed2R needle = do

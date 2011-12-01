@@ -15,9 +15,12 @@ module Distribution.PackDeps
     , loadPackage
       -- * Get multiple packages
     , filterPackages
+    , deepDeps
       -- * Reverse dependencies
     , Reverses
     , getReverses
+      -- * Helpers
+    , diName
     ) where
 
 import System.Directory (getAppUserDataDirectory)
@@ -47,6 +50,7 @@ import Data.Function (on)
 import Control.Arrow ((&&&))
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
+import qualified Data.Set as Set
 
 loadNewest :: IO Newest
 loadNewest = do
@@ -223,3 +227,27 @@ filterPackages needle =
             then Just desc
             else Nothing
     go _ = Nothing
+
+-- | Find all packages depended upon by the given list of packages.
+deepDeps :: Newest -> [DescInfo] -> [DescInfo]
+deepDeps newest dis =
+    go Set.empty dis
+  where
+    go _ [] = []
+    go viewed (di:dis)
+        | name `Set.member` viewed = go viewed dis
+        | otherwise = di : go viewed' (newDis ++ dis)
+      where
+        PackageIdentifier (PackageName name) _ = diPackage di
+        viewed' = Set.insert name viewed
+        newDis = mapMaybe getDI $ diDeps di
+        getDI :: Dependency -> Maybe DescInfo
+        getDI (Dependency (PackageName name) _) = do
+            pi <- Map.lookup name newest
+            piDesc pi
+
+diName :: DescInfo -> String
+diName =
+    unPN . pkgName . diPackage
+  where
+    unPN (PackageName pn) = pn
