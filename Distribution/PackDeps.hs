@@ -192,7 +192,8 @@ epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 notNewest :: Newest -> Dependency -> Maybe ((String, String), Tar.EpochTime)
 notNewest newest (Dependency (PackageName s) range) =
     case Map.lookup s newest of
-        Nothing -> Just ((s, " no version found"), 0)
+        --Nothing -> Just ((s, " no version found"), 0)
+        Nothing -> Nothing
         Just PackInfo { piVersion = version, piEpoch = e } ->
             if withinRange version range
                 then Nothing

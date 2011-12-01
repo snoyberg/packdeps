@@ -24,6 +24,7 @@ mkYesod "PD" [$parseRoutes|
 / RootR GET
 /feed FeedR GET
 /feed/#Text Feed2R GET
+/feeddeep/#Text Feed2DeepR GET
 /feed/#Text/#Text/#Text/#Text Feed3R GET
 /specific SpecificR GET
 /feed/specific/#Text SpecificFeedR GET
@@ -87,9 +88,8 @@ getRootR = defaultLayout $ do
 
 isDeep = fmap (== Just "on") $ runInputGet $ iopt textField "deep"
 
-getDeps needle = do
+getDeps deep needle = do
     PD newest _ <- getYesod
-    deep <- isDeep
     let descs' = filterPackages needle newest
         descs = if deep then deepDeps newest descs' else descs'
         go (_, _, AllNewest) = Nothing
@@ -105,7 +105,7 @@ getFeedR :: Handler RepHtml
 getFeedR = do
     needle <- runInputGet $ ireq textField "needle"
     deep <- isDeep
-    deps <- getDeps $ unpack needle
+    deps <- getDeps deep $ unpack needle
     let title = "Newer dependencies for " ++ unpack needle
     let deepR = (FeedR, [("needle", needle), ("deep", "on")])
     defaultLayout $ do
@@ -126,7 +126,7 @@ th, td
 h3
     margin: 20px 0 5px 0
 |]
-        let feedR = Feed2R needle
+        let feedR = (if deep then Feed2DeepR else Feed2R) needle
         atomLink feedR title
         [whamlet|
 <h1>#{title}
@@ -151,7 +151,14 @@ $if not deep
 |]
 
 getFeed2R needle = do
-    deps <- getDeps $ unpack needle
+    deps <- getDeps False $ unpack needle
+    feed2Helper needle deps
+
+getFeed2DeepR needle = do
+    deps <- getDeps True $ unpack needle
+    feed2Helper needle deps
+
+feed2Helper needle deps = do
     now <- liftIO getCurrentTime
     newsFeed Feed
         { feedTitle = pack $ "Newer dependencies for " ++ unpack needle
