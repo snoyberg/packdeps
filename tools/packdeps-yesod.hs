@@ -17,6 +17,7 @@ import qualified Data.ByteString.Char8 as S8
 import Data.Text (Text, pack, unpack)
 import Text.Hamlet (shamlet)
 import System.Environment (getArgs)
+import Data.List (sort)
 
 data PD = PD Newest Reverses
 mkYesod "PD" [$parseRoutes|
@@ -125,6 +126,15 @@ th, td
     padding: 5px
 h3
     margin: 20px 0 5px 0
+.packages
+    -webkit-column-count: 2
+    -moz-column-count: 2
+    column-count: 2
+.packages a, .packages a:visited
+    text-decoration: none
+    color: blue
+.packages a:hover
+    text-decoration: underline
 |]
         let feedR = (if deep then Feed2DeepR else Feed2R) needle
         atomLink feedR title
@@ -149,10 +159,10 @@ $if not deep
     <p>
         <a href=@?{deepR}>View outdated dependency for all ancestor packages too.
 <h3>Packages checked
-<ul>
-    $forall desc <- descs
-        <li>
-            $with name <- diName desc
+<div .packages>
+    <ol>
+        $forall name <- sort $ map diName descs
+            <li>
                 <a href="http://hackage.haskell.org/package/#{name}">#{name}
 |]
 
