@@ -13,7 +13,7 @@ import Distribution.Text hiding (Text)
 import Control.Arrow
 import Distribution.Version (withinRange)
 import qualified Data.Map as Map
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, pack, unpack, append)
 import Text.Hamlet (shamlet)
 import System.Environment (getArgs)
 import Data.List (sort)
@@ -200,9 +200,8 @@ feed2Helper needle deps = do
 
 getFeed3R :: Text -> Text -> Text -> Text -> Handler ()
 getFeed3R _ package _ _ =
-    redirectText RedirectPermanent
-  $ pack
-  $ "http://hackage.haskell.org/package/" ++ unpack package
+    redirect
+  $ "http://hackage.haskell.org/package/" `append` package
 
 main = do
     args <- getArgs
