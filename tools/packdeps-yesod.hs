@@ -13,7 +13,6 @@ import Distribution.Text hiding (Text)
 import Control.Arrow
 import Distribution.Version (withinRange)
 import qualified Data.Map as Map
-import qualified Data.ByteString.Char8 as S8
 import Data.Text (Text, pack, unpack)
 import Text.Hamlet (shamlet)
 import System.Environment (getArgs)
@@ -335,11 +334,11 @@ getReverseR dep = do
         setTitle [shamlet|Reverse dependencies for #{dep}|]
         addCassius mainCassius
         addHamlet [hamlet|
-<h1>#{show $ length rels} reverse dependencies for #{dep}&nbsp;#{display version}
+<h1><a href="http://hackage.haskell.org/package/#{dep}">#{dep}</a> #{display version}
 <table>
     <tr>
-        <th>Package
-        <th>Uses current version?
+        <th>#{show $ length rels} Reverse #{plural (length rels) "dep" "deps"}
+        <th>Accepted versions
     $forall rel <- rels
         <tr>
             $if Map.member (fst rel) reverse
@@ -347,7 +346,11 @@ getReverseR dep = do
             $else
                 <td>#{fst rel}
             $if withinRange version (snd rel)
-                <td>#{display (snd rel)}
+                <td><a href="http://hackage.haskell.org/package/#{fst rel}">#{display (snd rel)}
             $else
-                <td style="background-color:#fbb">#{display (snd rel)}
+                <td style="background-color:#fbb"><a href="http://hackage.haskell.org/package/#{fst rel}">#{display (snd rel)}
 |]
+  where
+    plural :: Int -> String -> String -> String
+    plural 1 s _ = s
+    plural _ _ pl = pl
