@@ -1,5 +1,5 @@
 name:            packdeps
-version:         0.1.0.1
+version:         0.2.0
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman <michael@snoyman.com>
@@ -61,7 +61,7 @@ executable             packdeps-yesod
                        , packdeps
                        , hamlet
                        , yesod-newsfeed
-                       , yesod
+                       , yesod >= 0.10
     else
         Buildable: False
 
