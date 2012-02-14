@@ -17,9 +17,10 @@ import Data.Text (Text, pack, unpack, append)
 import Text.Hamlet (shamlet)
 import System.Environment (getArgs)
 import Data.List (sort)
+import Data.Version (Version)
 
 data PD = PD Newest Reverses
-mkYesod "PD" [$parseRoutes|
+mkYesod "PD" [parseRoutes|
 /favicon.ico FaviconR GET
 / RootR GET
 /feed FeedR GET
@@ -32,12 +33,14 @@ mkYesod "PD" [$parseRoutes|
 /reverse ReverseListR GET
 /reverse/#Text ReverseR GET
 |]
-instance Yesod PD where approot _ = ""
+instance Yesod PD where
+    approot = ApprootStatic ""
 
 getFaviconR :: Handler ()
 getFaviconR = sendFile "image/x-icon" "favicon.ico"
 
-mainCassius = [$cassius|
+mainCassius :: CssUrl (Route PD)
+mainCassius = [cassius|
 body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
@@ -63,9 +66,10 @@ form p
     text-align: center
 |]
 
+getRootR :: Handler RepHtml
 getRootR = defaultLayout $ do
     setTitle "Hackage dependency monitor"
-    addCassius mainCassius
+    addCassius mainCassius :: Widget -- just get rid of a warning by using Widget
     [whamlet|
 <h1>Hackage Dependency Monitor
 <form action="@{FeedR}">
@@ -86,8 +90,12 @@ getRootR = defaultLayout $ do
     <a href="http://docs.yesodweb.com/">Powered by Yesod
 |]
 
+isDeep :: Handler Bool
 isDeep = fmap (== Just "on") $ runInputGet $ iopt textField "deep"
 
+getDeps :: Bool
+        -> String
+        -> Handler ([DescInfo], [((String, Version), ([(String, String)], UTCTime))])
 getDeps deep needle = do
     PD newest _ <- getYesod
     let descs' = filterPackages needle newest
@@ -110,7 +118,8 @@ getFeedR = do
     let deepR = (FeedR, [("needle", needle), ("deep", "on")])
     defaultLayout $ do
         setTitle $ toHtml title
-        addCassius [$cassius|body
+        addCassius [cassius|
+body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
     margin: 2em auto
@@ -165,14 +174,19 @@ $if not deep
                 <a href="http://hackage.haskell.org/package/#{name}">#{name}
 |]
 
+getFeed2R :: Text -> Handler RepAtomRss
 getFeed2R needle = do
     (_, deps) <- getDeps False $ unpack needle
     feed2Helper needle deps
 
+getFeed2DeepR :: Text -> Handler RepAtomRss
 getFeed2DeepR needle = do
     (_, deps) <- getDeps True $ unpack needle
     feed2Helper needle deps
 
+feed2Helper :: Text
+            -> [((String, Version), ([(String, String)], UTCTime))]
+            -> Handler RepAtomRss
 feed2Helper needle deps = do
     now <- liftIO getCurrentTime
     newsFeed Feed
@@ -185,13 +199,13 @@ feed2Helper needle deps = do
         , feedDescription = toHtml $ "Newer dependencies for " ++ unpack needle
         }
   where
-    go' ((name, version), (deps, time)) = FeedEntry
+    go' ((name, version), (deps', time)) = FeedEntry
         { feedEntryLink = Feed3R needle (pack name) (pack $ display version) (pack $ show time)
         , feedEntryUpdated = time
         , feedEntryTitle = pack $ "Outdated dependencies for " ++ name ++ " " ++ display version
         , feedEntryContent = [shamlet|
 <table border="1">
-    $forall d <- deps
+    $forall d <- deps'
         <tr>
             <th>#{fst d}
             <td>#{snd d}
@@ -203,6 +217,7 @@ getFeed3R _ package _ _ =
     redirect
   $ "http://hackage.haskell.org/package/" `append` package
 
+main :: IO ()
 main = do
     args <- getArgs
     if args == ["--save-newest"]
@@ -225,7 +240,8 @@ getSpecificR = do
                 (_, v, WontAccept cd _) -> Just (v, cd)
     defaultLayout $ do
         setTitle $ toHtml title
-        addCassius [$cassius|body
+        addCassius [cassius|
+body
     font-family: Arial,Helvetica,sans-serif
     width: 600px
     margin: 2em auto
@@ -264,6 +280,7 @@ $forall p <- packages
         <p>Invalid package name: #{fst p}
 |]
 
+getSpecificFeedR :: Text -> Handler RepAtomRss
 getSpecificFeedR packages' = do
     PD newest _ <- getYesod
     let descs = mapMaybe (flip getPackage newest) $ words $ unpack packages'
@@ -297,11 +314,11 @@ getSpecificFeedR packages' = do
 
 getReverseListR :: Handler RepHtml
 getReverseListR = do
-    PD _ reverse <- getYesod
+    PD _ reverse' <- getYesod
     defaultLayout $ do
         setTitle "Reverse Dependencies"
         addCassius mainCassius
-        addHamlet [$hamlet|
+        addHamlet [hamlet|
 <h1>Reverse Dependencies
 <p>Please choose a package below to view its reverse dependencies: those packages that depend upon it. This listing will also tell you which packages are incompatible with the current version of the package.
 <table
@@ -309,7 +326,7 @@ getReverseListR = do
         <th>Package
         <th>Total Dependencies
         <th>Total Outdated Dependencies
-    $forall p <- Map.toList reverse
+    $forall p <- Map.toList reverse'
         <tr>
             <td
                 <a href=@{ReverseR $ pack $ fst p}>#{fst p}
@@ -327,8 +344,8 @@ getReverseListR = do
 
 getReverseR :: Text -> Handler RepHtml
 getReverseR dep = do
-    PD _ reverse <- getYesod
-    (version, rels) <- maybe notFound return $ Map.lookup (unpack dep) reverse
+    PD _ reverse' <- getYesod
+    (version, rels) <- maybe notFound return $ Map.lookup (unpack dep) reverse'
     defaultLayout $ do
         setTitle [shamlet|Reverse dependencies for #{dep}|]
         addCassius mainCassius
@@ -340,7 +357,7 @@ getReverseR dep = do
         <th>Accepted versions
     $forall rel <- rels
         <tr>
-            $if Map.member (fst rel) reverse
+            $if Map.member (fst rel) reverse'
                 <td><a href=@{ReverseR $ pack $ fst rel}>#{fst rel}
             $else
                 <td>#{fst rel}
