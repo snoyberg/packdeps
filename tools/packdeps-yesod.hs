@@ -1,5 +1,6 @@
 {-# LANGUAGE QuasiQuotes, TypeFamilies, OverloadedStrings, MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+import Prelude hiding (writeFile)
 import Yesod
 import Yesod.AtomFeed
 import Yesod.Feed
@@ -11,13 +12,19 @@ import Data.Time
 import Distribution.Package
 import Distribution.Text hiding (Text)
 import Control.Arrow
-import Distribution.Version (withinRange)
+import Distribution.Version (VersionRange, withinRange)
 import qualified Data.Map as Map
 import Data.Text (Text, pack, unpack, append)
 import Text.Hamlet (shamlet)
 import System.Environment (getArgs)
 import Data.List (sort)
 import Data.Version (Version)
+import System.IO.Cautious (writeFileL)
+import qualified Data.ByteString.Lazy as L
+import Data.Aeson
+import Data.Aeson.Types (Parser)
+import Control.Monad (mzero)
+import Control.Applicative ((<$>), (<*>))
 
 data PD = PD Newest Reverses
 mkYesod "PD" [parseRoutes|
@@ -220,13 +227,75 @@ getFeed3R _ package _ _ =
 main :: IO ()
 main = do
     args <- getArgs
-    if args == ["--save-newest"]
+    if args == ["--save-reverses"]
         then do
             newest <- loadNewest
-            writeFile "newest" $ show newest
+            writeFileL "reverses" $ encode (newest, getReverses newest)
         else do
-            newest <- read `fmap` readFile "newest"
-            warpDebug 5005 $ PD newest $ getReverses newest
+            putStrLn "Loading reverses..."
+            Just (newest, reverses) <- fmap decode' $ L.readFile "reverses"
+            putStrLn "Done"
+            warpDebug 5005 $ PD newest reverses
+
+instance ToJSON Version where
+    toJSON = toJSONShow
+instance FromJSON Version where
+    parseJSON = parseJSONRead
+
+toJSONShow :: Show a => a -> Value
+toJSONShow = String . pack . show
+
+parseJSONRead :: Read a => Value -> Parser a
+parseJSONRead (String t) =
+    case reads $ unpack t of
+        (v, _):_ -> return v
+        _ -> mzero
+parseJSON _ = mzero
+
+instance ToJSON VersionRange where
+    toJSON = toJSONShow
+instance FromJSON VersionRange where
+    parseJSON = parseJSONRead
+
+instance ToJSON PackInfo where
+    toJSON (PackInfo a b c) = Data.Aeson.object
+        [ "version" .= a
+        , "desc"    .= b
+        , "epoch"   .= c
+        ]
+
+instance FromJSON PackInfo where
+    parseJSON (Object v) = PackInfo
+        <$> v .: "version"
+        <*> v .: "desc"
+        <*> v .: "epoch"
+    parseJSON _ = mzero
+
+instance ToJSON DescInfo where
+    toJSON (DescInfo a b c d) = Data.Aeson.object
+        [ "haystack" .= a
+        , "deps" .= b
+        , "package" .= c
+        , "synopsis" .= d
+        ]
+
+instance FromJSON DescInfo where
+    parseJSON (Object v) = DescInfo
+        <$> v .: "haystack"
+        <*> v .: "deps"
+        <*> v .: "package"
+        <*> v .: "synopsis"
+    parseJSON _ = mzero
+
+instance ToJSON PackageIdentifier where
+    toJSON = toJSONShow
+instance FromJSON PackageIdentifier where
+    parseJSON = parseJSONRead
+
+instance ToJSON Dependency where
+    toJSON = toJSONShow
+instance FromJSON Dependency where
+    parseJSON = parseJSONRead
 
 getSpecificR :: Handler RepHtml
 getSpecificR = do

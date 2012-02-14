@@ -21,6 +21,9 @@ module Distribution.PackDeps
     , getReverses
       -- * Helpers
     , diName
+      -- * Internal
+    , PackInfo (..)
+    , DescInfo (..)
     ) where
 
 import System.Directory (getAppUserDataDirectory)
