@@ -29,6 +29,7 @@ import qualified Data.Map as Map
 import Data.List (foldl', group, sort, isInfixOf, isPrefixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
 import Data.Maybe (mapMaybe, catMaybes)
+import Control.Exception (throw)
 
 import Distribution.Package
 import Distribution.PackageDescription
@@ -78,9 +79,9 @@ loadNewestFrom = fmap parseNewest . L.readFile
 parseNewest :: L.ByteString -> Newest
 parseNewest = foldl' addPackage Map.empty . entriesToList . Tar.read
 
-entriesToList :: Tar.Entries -> [Tar.Entry]
+entriesToList :: Tar.Entries Tar.FormatError -> [Tar.Entry]
 entriesToList Tar.Done = []
-entriesToList (Tar.Fail s) = error s
+entriesToList (Tar.Fail s) = throw s
 entriesToList (Tar.Next e es) = e : entriesToList es
 
 addPackage :: Newest -> Tar.Entry -> Newest
@@ -231,8 +232,8 @@ filterPackages needle =
 
 -- | Find all packages depended upon by the given list of packages.
 deepDeps :: Newest -> [DescInfo] -> [DescInfo]
-deepDeps newest dis =
-    go Set.empty dis
+deepDeps newest dis0 =
+    go Set.empty dis0
   where
     go _ [] = []
     go viewed (di:dis)
@@ -243,9 +244,9 @@ deepDeps newest dis =
         viewed' = Set.insert name viewed
         newDis = mapMaybe getDI $ diDeps di
         getDI :: Dependency -> Maybe DescInfo
-        getDI (Dependency (PackageName name) _) = do
-            pi <- Map.lookup name newest
-            piDesc pi
+        getDI (Dependency (PackageName name') _) = do
+            pi' <- Map.lookup name' newest
+            piDesc pi'
 
 diName :: DescInfo -> String
 diName =
