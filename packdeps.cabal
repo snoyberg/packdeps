@@ -1,5 +1,5 @@
 name:            packdeps
-version:         0.3.0
+version:         0.3.0.1
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman <michael@snoyman.com>
@@ -27,7 +27,7 @@ library
                    , text                      >= 0.7      && < 0.12
                    , Cabal                     >= 1.8      && < 1.15
                    , time                      >= 1.1.4
-                   , containers                >= 0.2      && < 0.5
+                   , containers                >= 0.2
                    , directory                 >= 1.0      && < 1.2
                    , filepath                  >= 1.1      && < 1.4
     exposed-modules: Distribution.PackDeps
