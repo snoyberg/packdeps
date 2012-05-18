@@ -69,10 +69,12 @@ library
                  , directory                     >= 1.1        && < 1.2
                  , warp                          >= 1.2        && < 1.3
                  , packdeps                      >= 0.4        && < 0.5
+                 , http-conduit                  >= 1.4        && < 1.5
                  , time
                  , Cabal
                  , containers
-                 , process
+                 , zlib
+                 , deepseq
 
 executable         packdeps
     if flag(library-only)
@@ -83,3 +85,4 @@ executable         packdeps
     build-depends:     base
                      , packdeps-yesod
                      , yesod-default
+    ghc-options:   -Wall -threaded -O2

@@ -3,3 +3,4 @@ client_session_key.aes
 newest
 /dist/
 yesod/dist/
+yesod/static/tmp/

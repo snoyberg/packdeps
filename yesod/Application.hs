@@ -10,15 +10,21 @@ import Settings
 import Yesod.Default.Config
 import Yesod.Default.Main
 import Yesod.Default.Handlers
-import Yesod.Logger (Logger, logBS, toProduction)
+import Yesod.Logger (Logger, logBS, toProduction, flushLogger)
 import Network.Wai.Middleware.RequestLogger (logCallback, logCallbackDev)
 import qualified Data.IORef as I
 
+import Codec.Compression.GZip (decompress)
+import Control.Exception (SomeException, try)
 import Control.Concurrent (forkIO, threadDelay)
 import qualified Data.ByteString as S
-import Distribution.PackDeps (Newest, Reverses, loadNewest, getReverses)
+import qualified Data.ByteString.Char8 as S8
+import Distribution.PackDeps (Newest, Reverses, parseNewest, getReverses, PackInfo (..), DescInfo, diName)
 import Control.Monad (forever)
-import System.Process (rawSystem)
+import Control.DeepSeq (NFData (rnf), deepseq)
+import Data.Version (Version (..))
+import Distribution.Version (VersionRange)
+import Network.HTTP.Conduit (simpleHttp)
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -35,6 +41,10 @@ mkYesodDispatch "App" resourcesApp
 -- migrations handled by Yesod.
 makeApplication :: AppConfig DefaultEnv Extra -> Logger -> IO Application
 makeApplication conf logger = do
+    _ <- forkIO $ forever $ do
+        threadDelay $ 1000 * 1000 * 10
+        flushLogger logger
+
     foundation <- makeFoundation conf setLogger
     app <- toWaiAppPlain foundation
     _ <- forkIO $ loadData log $ I.writeIORef (appData foundation) . Just
@@ -48,17 +58,23 @@ makeApplication conf logger = do
 loadData :: (S.ByteString -> IO ())
          -> ((Newest, Reverses) -> IO ())
          -> IO ()
-loadData log load = forever $ do
-    log "cabal update"
-    _ <- rawSystem "cabal" ["update"]
-    log "Loading data"
-    newest <- loadNewest
-    log "Loaded newest"
-    let reverses = getReverses newest
-    log "Get reverses"
-    load (newest, reverses)
-    log "Loaded, sleeping"
-    threadDelay $ 1000 * 1000 * 60 * 60
+loadData log update' = forever $ do
+    res <- try $ do
+        log "Downloading newest package list"
+        lbs <- simpleHttp "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
+        log "Loading data"
+        let newest = parseNewest $ decompress lbs
+        newest `deepseq` log "Loaded newest"
+        let reverses = getReverses newest
+        reverses `deepseq` log "Loaded reverses"
+        update' (newest, reverses)
+        log "Updated, sleeping"
+        threadDelay $ 1000 * 1000 * 60 * 60
+    case res of
+        Left e -> do
+            log $ S8.pack $ show (e :: SomeException)
+            threadDelay $ 1000 * 1000 * 30
+        Right () -> return ()
 
 makeFoundation :: AppConfig DefaultEnv Extra -> Logger -> IO App
 makeFoundation conf setLogger = do
@@ -74,3 +90,12 @@ getApplicationDev =
     loader = loadConfig (configSettings Development)
         { csParseExtra = parseExtra
         }
+
+-- orphans
+instance NFData PackInfo where
+    rnf (PackInfo a b c) = a `deepseq` b `deepseq` c `deepseq` ()
+instance NFData DescInfo where
+    rnf d = diName d `deepseq` ()
+instance NFData Version where
+    rnf (Version a b) = a `deepseq` b `deepseq` ()
+instance NFData VersionRange
