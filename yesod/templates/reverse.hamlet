@@ -1,0 +1,16 @@
+<h1>
+    <a href="http://hackage.haskell.org/package/#{dep}">#{dep}
+    \ #{display version}
+<table>
+    <tr>
+        <th>#{show $ length rels} Reverse #{plural (length rels) "dep" "deps"}
+        <th>Accepted versions
+    $forall rel <- rels
+        <tr>
+            $if Map.member (fst rel) reverse'
+                <td>
+                    <a href=@{ReverseR $ pack $ fst rel}>#{fst rel}
+            $else
+                <td>#{fst rel}
+            <td :withinRange version (snd rel):style="background-color:#fbb">
+                <a href="http://hackage.haskell.org/package/#{fst rel}">#{display (snd rel)}

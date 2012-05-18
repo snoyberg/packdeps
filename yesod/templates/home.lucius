@@ -1,0 +1,38 @@
+body {
+    font-family: Arial,Helvetica,sans-serif;
+    width: 600px;
+    margin: 2em auto;
+    text-align: center;
+}
+
+p {
+    text-align: justify
+}
+
+h2 {
+    border-bottom: 2px solid #999;
+}
+
+input[type=text] {
+    width: 400px;
+}
+
+#footer {
+    margin-top: 15px;
+    border-top: 1px dashed #999;
+    padding-top: 10px;
+}
+
+table {
+    border-collapse: collapse;
+    margin: 0 auto;
+}
+
+th, td {
+    border: 1px solid #333;
+}
+
+form p {
+    margin-top: 1em;
+    text-align: center
+}

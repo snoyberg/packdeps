@@ -1,0 +1,25 @@
+<h1>#{title}
+<p>
+    The following are the packages which have restrictive upper bounds. You can also #
+    <a href=@{feedR}>view this information as a news feed
+    \ so you can get automatic updates in your feed reader of choice.
+$if null deps
+    <p>
+        <b>All upper bounds are non-restrictive.
+$else
+    $forall d <- deps
+        <h3>#{fst (fst d)}-#{display (snd (fst d))}
+        <table>
+            $forall p <- fst (snd d)
+                <tr>
+                    <th>#{fst p}
+                    <td>#{snd p}
+$if not deep
+    <p>
+        <a href=@?{deepR}>View outdated dependency for all ancestor packages too.
+<h3>Packages checked
+<div .packages>
+    <ol>
+        $forall name <- sort $ map diName descs
+            <li>
+                <a href=http://hackage.haskell.org/package/#{name}>#{name}

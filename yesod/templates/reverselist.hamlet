@@ -1,0 +1,16 @@
+<h1>Reverse Dependencies
+<p>Please choose a package below to view its reverse dependencies: those packages that depend upon it. This listing will also tell you which packages are incompatible with the current version of the package.
+<table>
+    <tr>
+        <th>Package
+        <th>Total Dependencies
+        <th>Total Outdated Dependencies
+    $forall p <- Map.toList reverse'
+        <tr>
+            <td>
+                <a href=@{ReverseR $ pack $ fst p}>#{fst p}
+            <td>#{show $ length $ snd $ snd p}
+            $maybe o <- getOutdated $ snd p
+                <td style="color:#900">#{o}
+            $nothing
+                <td>0

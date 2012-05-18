@@ -1,0 +1,17 @@
+/static StaticR Static getStatic
+
+/favicon.ico FaviconR GET
+/robots.txt RobotsR GET
+
+/ HomeR GET
+
+/feed FeedR GET
+/feed/#Text Feed2R GET
+/feeddeep/#Text Feed2DeepR GET
+/feed/#Text/#Text/#Text/#Text Feed3R GET
+
+/specific SpecificR GET
+/feed/specific/#Text SpecificFeedR GET
+
+/reverse ReverseListR GET
+/reverse/#Text ReverseR GET

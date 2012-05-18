@@ -1,5 +1,5 @@
 name:            packdeps
-version:         0.3.0.1
+version:         0.4.0
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman <michael@snoyman.com>
@@ -14,10 +14,6 @@ stability:       Stable
 cabal-version:   >= 1.8
 build-type:      Simple
 homepage:        http://packdeps.haskellers.com/
-
-flag web
-  description: Build the web-based interface.
-  default: False
 
 library
     build-depends:   base                      >= 4        && < 5
@@ -37,35 +33,11 @@ executable             packdeps
     main-is:           packdeps-cli.hs
     hs-source-dirs:    tools
 
-    if flag(web)
-        Buildable: False
-    else
-        ghc-options:       -Wall
+    ghc-options:       -Wall
 
-        build-depends:   base                      >= 4        && < 5
-                       , Cabal
-                       , packdeps
-
-executable             packdeps-yesod
-    main-is:           packdeps-yesod.hs
-    hs-source-dirs:    tools
-
-    if flag(web)
-        ghc-options:       -Wall
-        build-depends:   base                      >= 4        && < 5
-                       , text
-                       , bytestring
-                       , containers
-                       , Cabal
-                       , time
-                       , packdeps
-                       , hamlet
-                       , yesod-newsfeed
-                       , yesod >= 0.10
-                       , cautious-file             >= 1.0      && < 1.1
-                       , aeson                     >= 0.6      && < 0.7
-    else
-        Buildable: False
+    build-depends:   base                      >= 4        && < 5
+                   , Cabal
+                   , packdeps
 
 source-repository head
   type:     git

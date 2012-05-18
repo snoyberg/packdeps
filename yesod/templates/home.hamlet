@@ -1,0 +1,17 @@
+<h1>Hackage Dependency Monitor
+<form action=@{FeedR}>
+    <input type=text name=needle required placeholder="Search string">
+    <input type=submit value=Check>
+    <p>
+        <a href=@{ReverseListR}>Reverse Dependency List
+<h2>What is this?
+<p>It can often get tedious to keep your package dependencies up-to-date. This tool is meant to alleviate a lot of the burden. It will automatically determine when an upper bound on a package prevents the usage of a newer version. For example, if foo depends on bar &gt;= 0.1 &amp;&amp; &lt; 0.2, and bar 0.2 exists, this tool will flag it.
+<p>Enter a search string in the box above. It will find all packages containing that string in the package name, maintainer or author fields, and create an Atom feed for restrictive bounds. Simply add that URL to a news reader, and you're good to go!
+<p>
+    All of the code is #
+    <a href="http://github.com/snoyberg/packdeps">available on Github
+    . Additionally, there is a #
+    <a href="http://hackage.haskell.org/package/packdeps">package on Hackage
+    \ with the code powering this site both as a library and as an executable, so you can test code which is not uploaded to the public Hackage server.
+<div #footer>
+    <a href=http://www.yesodweb.com/>Powered by Yesod

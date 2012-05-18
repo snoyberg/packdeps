@@ -1,0 +1,18 @@
+<h1>#{title}
+<p>
+    The following are the packages which have restrictive upper bounds. You can also #
+    <a href=@{feedR}>view this information as a news feed
+    \ so you can get automatic updates in your feed reader of choice.
+$forall p <- packages
+    $maybe descinfo <- snd p
+        $maybe x <- checkDeps' descinfo
+            <h3>#{fst p}-#{display (fst x)}
+            <table>
+                $forall p <- snd x
+                    <tr>
+                        <th>#{fst p}
+                        <td>#{snd p}
+        $nothing
+            <h3>#{fst p} up to date
+    $nothing
+        <p>Invalid package name: #{fst p}
