@@ -14,17 +14,18 @@ import Yesod.Logger (Logger, logBS, toProduction, flushLogger)
 import Network.Wai.Middleware.RequestLogger (logCallback, logCallbackDev)
 import qualified Data.IORef as I
 
-import Codec.Compression.GZip (decompress)
 import Control.Exception (SomeException, try)
 import Control.Concurrent (forkIO, threadDelay)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import Distribution.PackDeps (Newest, Reverses, parseNewest, getReverses, PackInfo (..), DescInfo, diName)
+import Distribution.PackDeps (Newest, Reverses, loadNewestFrom, getReverses, PackInfo (..), DescInfo, diName)
 import Control.Monad (forever)
 import Control.DeepSeq (NFData (rnf), deepseq)
 import Data.Version (Version (..))
 import Distribution.Version (VersionRange)
-import Network.HTTP.Conduit (simpleHttp)
+import Network.HTTP.Conduit
+import Data.Conduit (($$))
+import Data.Conduit.Binary (sinkFile)
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -58,23 +59,28 @@ makeApplication conf logger = do
 loadData :: (S.ByteString -> IO ())
          -> ((Newest, Reverses) -> IO ())
          -> IO ()
-loadData log update' = forever $ do
-    res <- try $ do
-        log "Downloading newest package list"
-        lbs <- simpleHttp "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
-        log "Loading data"
-        let newest = parseNewest $ decompress lbs
-        newest `deepseq` log "Loaded newest"
-        let reverses = getReverses newest
-        reverses `deepseq` log "Loaded reverses"
-        update' (newest, reverses)
-        log "Updated, sleeping"
-        threadDelay $ 1000 * 1000 * 60 * 60
-    case res of
-        Left e -> do
-            log $ S8.pack $ show (e :: SomeException)
-            threadDelay $ 1000 * 1000 * 30
-        Right () -> return ()
+loadData log update' = do
+    req' <- parseUrl "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
+    let req = req' { decompress = alwaysDecompress }
+    forever $ do
+        res <- try $ do
+            log "Downloading newest package list"
+            withManager $ \m -> do
+                res <- http req m
+                responseBody res $$ sinkFile "tmp"
+            log "Loading data"
+            newest <- loadNewestFrom "tmp"
+            newest `deepseq` log "Loaded newest"
+            let reverses = getReverses newest
+            reverses `deepseq` log "Loaded reverses"
+            update' (newest, reverses)
+            log "Updated, sleeping"
+            threadDelay $ 1000 * 1000 * 60 * 60
+        case res of
+            Left e -> do
+                log $ S8.pack $ show (e :: SomeException)
+                threadDelay $ 1000 * 1000 * 30
+            Right () -> return ()
 
 makeFoundation :: AppConfig DefaultEnv Extra -> Logger -> IO App
 makeFoundation conf setLogger = do
