@@ -1,5 +1,5 @@
 name:            packdeps
-version:         0.4.0
+version:         0.4.0.1
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman <michael@snoyman.com>
@@ -18,14 +18,14 @@ homepage:        http://packdeps.haskellers.com/
 library
     build-depends:   base                      >= 4        && < 5
                    , tar                       >= 0.4      && < 0.5
-                   , split                     >= 0.1.2.3  && < 0.2
-                   , bytestring                >= 0.9      && < 0.10
-                   , text                      >= 0.7      && < 0.12
-                   , Cabal                     >= 1.8      && < 1.15
+                   , split                     >= 0.1.2.3
+                   , bytestring                >= 0.9
+                   , text                      >= 0.7
+                   , Cabal                     >= 1.8      && < 1.17
                    , time                      >= 1.1.4
                    , containers                >= 0.2
-                   , directory                 >= 1.0      && < 1.2
-                   , filepath                  >= 1.1      && < 1.4
+                   , directory                 >= 1.0
+                   , filepath                  >= 1.1
     exposed-modules: Distribution.PackDeps
     ghc-options:     -Wall
 
