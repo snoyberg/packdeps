@@ -22,7 +22,7 @@ library
                    , bytestring                >= 0.9
                    , text                      >= 0.7
                    , Cabal                     >= 1.8      && < 1.17
-                   , time                      >= 1.1.4
+                   , time                      >= 1.1.4 && < 1.2
                    , containers                >= 0.2
                    , directory                 >= 1.0
                    , filepath                  >= 1.1

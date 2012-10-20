@@ -1,6 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Distribution.PackDeps
     ( -- * Data types
-      Newest
+      Newest (..)
     , CheckDepsRes (..)
     , DescInfo
       -- * Read package database
@@ -19,28 +20,32 @@ module Distribution.PackDeps
       -- * Reverse dependencies
     , Reverses
     , getReverses
-      -- * Helpers
-    , diName
-      -- * Internal
-    , PackInfo (..)
-    , DescInfo (..)
     ) where
+
+import Prelude
+import Data.Text (Text, isInfixOf, toCaseFold, pack)
+import qualified Data.HashMap.Strict as HMap
+import qualified Data.Vector as Vector
 
 import System.Directory (getAppUserDataDirectory)
 import System.FilePath ((</>))
 import qualified Data.Map as Map
-import Data.List (foldl', group, sort, isInfixOf, isPrefixOf)
+import Data.List (foldl', group, sort, isPrefixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
 import Data.Maybe (mapMaybe, catMaybes)
 import Control.Exception (throw)
+import Control.Monad (join)
 
-import Distribution.Package
+import Distribution.PackDeps.Types
+import Distribution.PackDeps.Util
+
+import Distribution.Package hiding (PackageName)
+import qualified Distribution.Package as D
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
-import Distribution.Version
-import Distribution.Text
+import qualified Distribution.Version as D
+import Distribution.Text hiding (Text)
 
-import Data.Char (toLower)
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -62,7 +67,9 @@ loadNewest = do
     cfg <- readFile (c </> "config")
     let repos        = reposFromConfig cfg
         tarName repo = c </> "packages" </> repo </> "00-index.tar"
-    fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom . tarName) $ repos
+    fmap (Newest . unionsWith maxVersion . map unNewest) $ mapM (loadNewestFrom . tarName) repos
+
+unionsWith f = foldl' (HMap.unionWith f) HMap.empty
 
 reposFromConfig :: String -> [String]
 reposFromConfig = map (takeWhile (/= ':'))
@@ -80,7 +87,7 @@ loadNewestFrom :: FilePath -> IO Newest
 loadNewestFrom = fmap parseNewest . L.readFile
 
 parseNewest :: L.ByteString -> Newest
-parseNewest = foldl' addPackage Map.empty . entriesToList . Tar.read
+parseNewest = foldl' addPackage (Newest HMap.empty) . entriesToList . Tar.read
 
 entriesToList :: Tar.Entries Tar.FormatError -> [Tar.Entry]
 entriesToList Tar.Done = []
@@ -88,171 +95,168 @@ entriesToList (Tar.Fail s) = throw s
 entriesToList (Tar.Next e es) = e : entriesToList es
 
 addPackage :: Newest -> Tar.Entry -> Newest
-addPackage m entry =
+addPackage (Newest m) entry = Newest $
     case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
         [package', versionS, _] ->
-            case simpleParse versionS of
-                Just version ->
-                    case Map.lookup package' m of
-                        Nothing -> go package' version
-                        Just PackInfo { piVersion = oldv } ->
-                            if version > oldv
-                                then go package' version
-                                else m
-                Nothing -> m
+            let package'' = PackageName $ pack package'
+             in case fmap convertVersion $ simpleParse versionS of
+                    Just version ->
+                        case HMap.lookup package'' m of
+                            Nothing -> go package'' version
+                            Just PackInfo { piVersion = oldv } ->
+                                if version > oldv
+                                    then go package'' version
+                                    else m
+                    Nothing -> m
         _ -> m
   where
     go package' version =
         case Tar.entryContent entry of
             Tar.NormalFile bs _ ->
-                 Map.insert package' PackInfo
+                 HMap.insert package' PackInfo
                         { piVersion = version
                         , piDesc = parsePackage bs
                         , piEpoch = Tar.entryTime entry
                         } m
             _ -> m
 
-data PackInfo = PackInfo
-    { piVersion :: Version
-    , piDesc :: Maybe DescInfo
-    , piEpoch :: Tar.EpochTime
-    }
-    deriving (Show, Read)
-
-maxVersion :: PackInfo -> PackInfo -> PackInfo
+maxVersion :: Ord v => PackInfo n v -> PackInfo n v -> PackInfo n v
 maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
 
--- | The newest version of every package.
-type Newest = Map.Map String PackInfo
-
-type Reverses = Map.Map String (Version, [(String, VersionRange)])
-
 getReverses :: Newest -> Reverses
-getReverses newest =
-    Map.fromList withVersion
+getReverses (Newest newest) =
+    HMap.fromList withVersion
   where
     -- dep = dependency, rel = relying package
-    toTuples (_, PackInfo { piDesc = Nothing }) = []
-    toTuples (rel, PackInfo { piDesc = Just DescInfo { diDeps = deps } }) =
-        map (toTuple rel) deps
-    toTuple rel (Dependency (PackageName dep) range) = (dep, (rel, range))
-    hoist :: Ord a => [(a, b)] -> [(a, [b])]
-    hoist = map ((fst . head) &&& map snd)
-          . groupBy ((==) `on` fst)
-          . sortBy (comparing fst)
-    hoisted = hoist $ concatMap toTuples $ Map.toList newest
-    withVersion = mapMaybe addVersion hoisted
+    --toTuples :: (PackageName, PackInfo) -> HMap.HashMap PackageName (HMap.HashMap PackageName VersionRange)
+    toTuples (_, PackInfo { piDesc = Nothing' }) = HMap.empty
+    toTuples (rel, PackInfo { piDesc = Just' DescInfo { diDeps = deps } }) =
+        combine $ map (toTuple rel) $ HMap.toList deps
+
+    combine = unionsWith HMap.union
+
+    toTuple rel (dep, range) = HMap.singleton dep $ HMap.singleton rel range
+
+    hoisted :: HMap.HashMap PackageName (HMap.HashMap PackageName (VersionRange Version))
+    hoisted = combine $ map toTuples $ HMap.toList newest
+
+    withVersion = mapMaybe addVersion $ HMap.toList hoisted
+
     addVersion (dep, rels) =
-        case Map.lookup dep newest of
+        case HMap.lookup dep newest of
             Nothing -> Nothing
             Just PackInfo { piVersion = v} -> Just (dep, (v, rels))
 
--- | Information on a single package.
-data DescInfo = DescInfo
-    { diHaystack :: String
-    , diDeps :: [Dependency]
-    , diPackage :: PackageIdentifier
-    , diSynopsis :: String
-    }
-    deriving (Show, Read)
-
-getDescInfo :: GenericPackageDescription -> DescInfo
+getDescInfo :: GenericPackageDescription -> DescInfo PackageName Version
 getDescInfo gpd = DescInfo
-    { diHaystack = map toLower $ author p ++ maintainer p ++ name
+    { diHaystack = toCaseFold $ pack $ author p ++ maintainer p ++ name
     , diDeps = getDeps gpd
-    , diPackage = pi'
-    , diSynopsis = synopsis p
+    , diSynopsis = pack $ synopsis p
     }
   where
     p = packageDescription gpd
-    pi'@(PackageIdentifier (PackageName name) _) = package p
+    pi'@(PackageIdentifier (D.PackageName name) version) = package p
 
-getDeps :: GenericPackageDescription -> [Dependency]
-getDeps x = concat
+getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (VersionRange Version)
+getDeps x = HMap.fromList
+          $ map (\(Dependency (D.PackageName k) v) -> (PackageName $ pack k, convertVersionRange v))
+          $ concat
           $ maybe id ((:) . condTreeConstraints) (condLibrary x)
           $ map (condTreeConstraints . snd) (condExecutables x)
 
-checkDeps :: Newest -> DescInfo
+convertVersionRange :: D.VersionRange -> VersionRange Version
+convertVersionRange =
+    goR
+  where
+    goR D.AnyVersion = AnyVersion
+    goR (D.ThisVersion x) = ThisVersion $ convertVersion x
+    goR (D.LaterVersion x) = LaterVersion $ convertVersion x
+    goR (D.EarlierVersion x) = EarlierVersion $ convertVersion x
+    goR (D.WildcardVersion x) = WildcardVersion $ convertVersion x
+    goR (D.UnionVersionRanges x y) = UnionVersionRanges (goR x) (goR y)
+    goR (D.IntersectVersionRanges x y) = IntersectVersionRanges (goR x) (goR y)
+    goR (D.VersionRangeParens x) = VersionRangeParens $ goR x
+
+convertVersion :: D.Version -> Version
+convertVersion (D.Version x y) = Version (Vector.fromList x) (Vector.fromList $ map pack y)
+
+checkDeps :: Newest
+          -> (PackageName, Version, DescInfo PackageName Version)
           -> (PackageName, Version, CheckDepsRes)
-checkDeps newest desc =
-    case mapMaybe (notNewest newest) $ diDeps desc of
+checkDeps newest (name, version, desc) =
+    case mapMaybe (notNewest newest) $ HMap.toList $ diDeps desc of
         [] -> (name, version, AllNewest)
-        x -> let y = map head $ group $ sort $ map fst x
+        x -> let y = HMap.fromList $ map fst x
                  et = maximum $ map snd x
               in (name, version, WontAccept y $ epochToTime et)
-  where
-    PackageIdentifier name version = diPackage desc
 
 -- | Whether or not a package can accept all of the newest versions of its
 -- dependencies. If not, it returns a list of packages which are not accepted,
 -- and a timestamp of the most recently updated package.
 data CheckDepsRes = AllNewest
-                  | WontAccept [(String, String)] UTCTime
+                  | WontAccept (HMap.HashMap PackageName Version) UTCTime
     deriving Show
 
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
-notNewest :: Newest -> Dependency -> Maybe ((String, String), Tar.EpochTime)
-notNewest newest (Dependency (PackageName s) range) =
-    case Map.lookup s newest of
+notNewest :: Newest -> (PackageName, VersionRange Version) -> Maybe ((PackageName, Version), Tar.EpochTime)
+notNewest (Newest newest) (s, range) =
+    case HMap.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
         Just PackInfo { piVersion = version, piEpoch = e } ->
             if withinRange version range
                 then Nothing
-                else Just ((s, display version), e)
+                else Just ((s, version), e)
 
 -- | Loads up the newest version of a package from the 'Newest' list, if
 -- available.
-getPackage :: String -> Newest -> Maybe DescInfo
-getPackage s n = Map.lookup s n >>= piDesc
+getPackage :: PackageName -> Newest -> Maybe (PackageName, Version, DescInfo PackageName Version)
+getPackage s (Newest n) = do
+    pi <- HMap.lookup s n
+    di <- m'ToM $ piDesc pi
+    return (s, piVersion pi, di)
 
 -- | Parse information on a package from the contents of a cabal file.
-parsePackage :: L.ByteString -> Maybe DescInfo
+parsePackage :: L.ByteString -> Maybe' (DescInfo PackageName Version)
 parsePackage lbs =
     case parsePackageDescription $ T.unpack
        $ T.decodeUtf8With T.lenientDecode lbs of
-        ParseOk _ x -> Just $ getDescInfo x
-        _ -> Nothing
+        ParseOk _ x -> Just' $ getDescInfo x
+        _ -> Nothing'
 
 -- | Load a single package from a cabal file.
-loadPackage :: FilePath -> IO (Maybe DescInfo)
+loadPackage :: FilePath -> IO (Maybe' (DescInfo PackageName Version))
 loadPackage = fmap parsePackage . L.readFile
 
 -- | Find all of the packages matching a given search string.
-filterPackages :: String -> Newest -> [DescInfo]
+filterPackages :: Text -> Newest -> [(PackageName, Version, DescInfo PackageName Version)]
 filterPackages needle =
-    mapMaybe go . Map.elems
+    mapMaybe go . HMap.toList . unNewest
   where
-    needle' = map toLower needle
-    go PackInfo { piDesc = Just desc } =
-        if needle' `isInfixOf` diHaystack desc &&
+    go (name, PackInfo { piVersion = v, piDesc = Just' desc }) =
+        if toCaseFold needle `isInfixOf` diHaystack desc &&
            not ("(deprecated)" `isInfixOf` diSynopsis desc)
-            then Just desc
+            then Just (name, v, desc)
             else Nothing
     go _ = Nothing
 
 -- | Find all packages depended upon by the given list of packages.
-deepDeps :: Newest -> [DescInfo] -> [DescInfo]
-deepDeps newest dis0 =
+deepDeps :: Newest
+         -> [(PackageName, Version, DescInfo PackageName Version)]
+         -> [(PackageName, Version, DescInfo PackageName Version)]
+deepDeps (Newest newest) dis0 =
     go Set.empty dis0
   where
     go _ [] = []
-    go viewed (di:dis)
+    go viewed ((name, v, di):dis)
         | name `Set.member` viewed = go viewed dis
-        | otherwise = di : go viewed' (newDis ++ dis)
+        | otherwise = (name, v, di) : go viewed' (newDis ++ dis)
       where
-        PackageIdentifier (PackageName name) _ = diPackage di
         viewed' = Set.insert name viewed
-        newDis = mapMaybe getDI $ diDeps di
-        getDI :: Dependency -> Maybe DescInfo
-        getDI (Dependency (PackageName name') _) = do
-            pi' <- Map.lookup name' newest
-            piDesc pi'
-
-diName :: DescInfo -> String
-diName =
-    unPN . pkgName . diPackage
-  where
-    unPN (PackageName pn) = pn
+        newDis = mapMaybe getDI $ HMap.keys $ diDeps di
+        getDI name = do
+            pi <- HMap.lookup name newest
+            di <- m'ToM $ piDesc pi
+            return (name, piVersion pi, di)

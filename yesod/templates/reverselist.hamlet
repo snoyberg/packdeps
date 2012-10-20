@@ -5,11 +5,11 @@
         <th>Package
         <th>Total Dependencies
         <th>Total Outdated Dependencies
-    $forall p <- Map.toList reverse'
+    $forall p <- H.toList reverse'
         <tr>
             <td>
-                <a href=@{ReverseR $ pack $ fst p}>#{fst p}
-            <td>#{show $ length $ snd $ snd p}
+                <a href=@{ReverseR $ unPackageName $ fst p}>#{unPackageName $ fst p}
+            <td>#{show $ H.size $ snd $ snd p}
             $maybe o <- getOutdated $ snd p
                 <td style="color:#900">#{o}
             $nothing

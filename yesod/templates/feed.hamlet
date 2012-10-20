@@ -8,18 +8,18 @@ $if null deps
         <b>All upper bounds are non-restrictive.
 $else
     $forall d <- deps
-        <h3>#{fst (fst d)}-#{display (snd (fst d))}
+        <h3>#{fst (fst d)}-#{show (snd (fst d))}
         <table>
-            $forall p <- fst (snd d)
+            $forall p <- H.toList $ fst (snd d)
                 <tr>
-                    <th>#{fst p}
-                    <td>#{snd p}
+                    <th>#{unPackageName $ fst p}
+                    <td>#{show $ snd p}
 $if not deep
     <p>
         <a href=@?{deepR}>View outdated dependency for all ancestor packages too.
 <h3>Packages checked
 <div .packages>
     <ol>
-        $forall name <- sort $ map diName descs
+        $forall name <- sort $ map fst3 descs
             <li>
-                <a href=http://hackage.haskell.org/package/#{name}>#{name}
+                <a href=http://hackage.haskell.org/package/#{unPackageName name}>#{unPackageName name}

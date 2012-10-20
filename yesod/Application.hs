@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Application
     ( makeApplication
@@ -10,21 +12,20 @@ import Settings
 import Yesod.Default.Config
 import Yesod.Default.Main
 import Yesod.Default.Handlers
-import Yesod.Logger (Logger, logBS, toProduction, flushLogger)
-import Network.Wai.Middleware.RequestLogger (logCallback, logCallbackDev)
 import qualified Data.IORef as I
 
 import Control.Exception (SomeException, try)
 import Control.Concurrent (forkIO, threadDelay)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import Distribution.PackDeps (Newest, Reverses, loadNewestFrom, getReverses, PackInfo (..), DescInfo, diName)
+import Distribution.PackDeps (Newest, Reverses, loadNewestFrom, getReverses, DescInfo)
+import Distribution.PackDeps.Types
 import Control.Monad (forever)
 import Control.DeepSeq (NFData (rnf), deepseq)
 import Data.Version (Version (..))
 import Distribution.Version (VersionRange)
 import Network.HTTP.Conduit
-import Data.Conduit (($$))
+import Data.Conduit (($$+-))
 import Data.Conduit.Binary (sinkFile)
 
 -- Import all relevant handler modules here.
@@ -40,53 +41,42 @@ mkYesodDispatch "App" resourcesApp
 -- performs initialization and creates a WAI application. This is also the
 -- place to put your migrate statements to have automatic database
 -- migrations handled by Yesod.
-makeApplication :: AppConfig DefaultEnv Extra -> Logger -> IO Application
-makeApplication conf logger = do
-    _ <- forkIO $ forever $ do
-        threadDelay $ 1000 * 1000 * 10
-        flushLogger logger
-
-    foundation <- makeFoundation conf setLogger
+makeApplication :: AppConfig DefaultEnv Extra -> IO Application
+makeApplication conf = do
+    foundation <- makeFoundation conf
     app <- toWaiAppPlain foundation
-    _ <- forkIO $ loadData log $ I.writeIORef (appData foundation) . Just
-    return $ logWare app
-  where
-    setLogger = if development then logger else toProduction logger
-    log       = logBS setLogger
-    logWare   = if development then logCallbackDev log
-                               else logCallback    log
+    _ <- forkIO $ loadData $ I.writeIORef (appData foundation) . Just
+    return app
 
-loadData :: (S.ByteString -> IO ())
-         -> ((Newest, Reverses) -> IO ())
+loadData :: ((Newest, Reverses) -> IO ())
          -> IO ()
-loadData log update' = do
+loadData update' = do
+    putStrLn "Entered loadData"
     req' <- parseUrl "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
     let req = req' { decompress = alwaysDecompress }
     forever $ do
+        putStrLn "In forever"
         res <- try $ do
-            log "Downloading newest package list"
+            {-
             withManager $ \m -> do
                 res <- http req m
-                responseBody res $$ sinkFile "tmp"
-            log "Loading data"
-            newest <- loadNewestFrom "tmp"
-            newest `deepseq` log "Loaded newest"
+                responseBody res $$+- sinkFile "tmp"
+            -}
+            putStrLn "Finished writing"
+            !newest <- fmap (newestFromIds . newestToIds) $ loadNewestFrom "tmp"
             let reverses = getReverses newest
-            reverses `deepseq` log "Loaded reverses"
             update' (newest, reverses)
-            log "Updated, sleeping"
             threadDelay $ 1000 * 1000 * 60 * 60
         case res of
-            Left e -> do
-                log $ S8.pack $ show (e :: SomeException)
+            Left (e :: SomeException) -> do
                 threadDelay $ 1000 * 1000 * 30
             Right () -> return ()
 
-makeFoundation :: AppConfig DefaultEnv Extra -> Logger -> IO App
-makeFoundation conf setLogger = do
+makeFoundation :: AppConfig DefaultEnv Extra -> IO App
+makeFoundation conf = do
     s <- staticSite
     idata <- I.newIORef Nothing
-    return $ App conf setLogger s idata
+    return $ App conf s idata
 
 -- for yesod devel
 getApplicationDev :: IO (Int, Application)
@@ -96,12 +86,3 @@ getApplicationDev =
     loader = loadConfig (configSettings Development)
         { csParseExtra = parseExtra
         }
-
--- orphans
-instance NFData PackInfo where
-    rnf (PackInfo a b c) = a `deepseq` b `deepseq` c `deepseq` ()
-instance NFData DescInfo where
-    rnf d = diName d `deepseq` ()
-instance NFData Version where
-    rnf (Version a b) = a `deepseq` b `deepseq` ()
-instance NFData VersionRange

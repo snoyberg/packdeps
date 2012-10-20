@@ -16,6 +16,9 @@ import Text.Shakespeare.Text (st)
 import Language.Haskell.TH.Syntax
 import Yesod.Default.Config
 import qualified Yesod.Default.Util
+import Yesod.Default.Util
+import Data.Default (def)
+import Text.Hamlet
 import Data.Text (Text)
 import Data.Yaml
 import Control.Applicative
@@ -48,9 +51,16 @@ staticRoot conf = [st|#{appRoot conf}/static|]
 -- The rest of this file contains settings which rarely need changing by a
 -- user.
 
+widgetFileSettings :: WidgetFileSettings
+widgetFileSettings = def
+    { wfsHamletSettings = defaultHamletSettings
+        { hamletNewlines = AlwaysNewlines
+        }
+    }
 widgetFile :: String -> Q Exp
-widgetFile = if development then Yesod.Default.Util.widgetFileReload
-                            else Yesod.Default.Util.widgetFileNoReload
+widgetFile = (if development then widgetFileReload
+                             else widgetFileNoReload)
+              widgetFileSettings
 
 data Extra = Extra
     { extraCopyright :: Text

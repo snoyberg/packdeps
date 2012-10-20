@@ -14,7 +14,6 @@ import Yesod
 import Yesod.Static
 import Yesod.Default.Config
 import Yesod.Default.Util (addStaticContentExternal)
-import Yesod.Logger (Logger, logMsg, formatLogText)
 import qualified Settings
 --import Settings.StaticFiles
 import Settings (widgetFile, Extra (..))
@@ -29,7 +28,6 @@ import Distribution.PackDeps (Newest, Reverses)
 -- access to the data present here.
 data App = App
     { settings :: AppConfig DefaultEnv Extra
-    , getLogger :: Logger
     , getStatic :: Static -- ^ Settings for static file serving.
     , appData :: IORef (Maybe (Newest, Reverses))
     }
@@ -89,9 +87,6 @@ instance Yesod App where
     urlRenderOverride y (StaticR s) =
         Just $ uncurry (joinPath y (Settings.staticRoot $ settings y)) $ renderRoute s
     urlRenderOverride _ _ = Nothing
-
-    messageLogger y loc level msg =
-      formatLogText (getLogger y) loc level msg >>= logMsg (getLogger y)
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows

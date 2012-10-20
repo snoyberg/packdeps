@@ -24,6 +24,7 @@ import Control.Applicative ((<$>), (<*>), pure)
 import Data.Text (Text, pack)
 import Settings.StaticFiles
 import Settings.Development
+import Data.HashMap.Strict (HashMap)
 
 import Data.Time (UTCTime)
 import Distribution.PackDeps
@@ -33,8 +34,7 @@ import Distribution.PackDeps
 import Data.Maybe (mapMaybe)
 import Data.Ord (comparing)
 import Data.List (sortBy)
-import Distribution.Version (Version)
-import Distribution.Package (PackageName (PackageName))
+import Distribution.PackDeps.Types (PackageName (PackageName), Version)
 import Data.IORef (readIORef)
 
 #if __GLASGOW_HASKELL__ < 704
@@ -52,8 +52,11 @@ getData = do
     maybe (error "Still loading data, please wait") return mdata
 
 getDeps :: Bool
-        -> String
-        -> Handler ([DescInfo], [((String, Version), ([(String, String)], UTCTime))])
+        -> Text
+        -> Handler
+            ( [(PackageName, Version, DescInfo PackageName Version)]
+            , [((Text, Version), (HashMap PackageName Version, UTCTime))]
+            )
 getDeps deep needle = do
     (newest, _) <- getData
     let descs' = filterPackages needle newest

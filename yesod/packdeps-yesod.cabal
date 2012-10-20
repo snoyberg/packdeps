@@ -21,6 +21,7 @@ Flag library-only
     Default:       False
 
 library
+    hs-source-dirs:  ., ..
     exposed-modules: Application
                      Foundation
                      Import
@@ -28,6 +29,9 @@ library
                      Settings.StaticFiles
                      Settings.Development
                      Handler.Home
+                     Distribution.PackDeps
+                     Distribution.PackDeps.Types
+                     Distribution.PackDeps.Util
 
     if flag(dev) || flag(library-only)
         cpp-options:   -DDEVELOPMENT
@@ -49,32 +53,43 @@ library
                 NoMonomorphismRestriction
 
     build-depends: base                          >= 4          && < 5
-                 , yesod                         >= 1.0        && < 1.1
-                 , yesod-core                    >= 1.0        && < 1.1
-                 , yesod-static                  >= 1.0        && < 1.1
-                 , yesod-default                 >= 1.0        && < 1.1
-                 , yesod-form                    >= 1.0        && < 1.1
-                 , yesod-newsfeed                >= 1.0        && < 1.1
-                 , clientsession                 >= 0.7.3      && < 0.8
+                 , yesod                         >= 1.1        && < 1.2
+                 , yesod-core                    >= 1.1        && < 1.2
+                 , yesod-static                  >= 1.1        && < 1.2
+                 , yesod-default                 >= 1.1        && < 1.2
+                 , yesod-form                    >= 1.1        && < 1.2
+                 , yesod-newsfeed                >= 1.1        && < 1.2
+                 , clientsession
                  , bytestring                    >= 0.9        && < 0.10
                  , text                          >= 0.11       && < 0.12
                  , template-haskell
-                 , hamlet                        >= 1.0        && < 1.1
+                 , hamlet                        >= 1.1        && < 1.2
                  , shakespeare-css               >= 1.0        && < 1.1
                  , shakespeare-js                >= 1.0        && < 1.1
                  , shakespeare-text              >= 1.0        && < 1.1
                  , monad-control                 >= 0.3        && < 0.4
-                 , wai-extra                     >= 1.2        && < 1.3
-                 , yaml                          >= 0.7        && < 0.8
+                 , wai-extra                     >= 1.3        && < 1.4
+                 , yaml                          >= 0.8        && < 0.9
                  , directory                     >= 1.1        && < 1.2
-                 , warp                          >= 1.2        && < 1.3
+                 , warp                          >= 1.3        && < 1.4
                  , packdeps                      >= 0.4        && < 0.5
-                 , http-conduit                  >= 1.4.1.5    && < 1.5
-                 , conduit                       >= 0.4        && < 0.5
+                 , http-conduit
+                 , conduit                       >= 0.5        && < 0.6
                  , time
                  , Cabal
                  , containers
                  , deepseq
+                 , tar
+                 , split
+                 , vector
+                 , hashable
+                 , transformers
+                 , binary
+                 , unordered-containers
+                 , ghc-prim
+                 , classy-prelude-conduit
+                 , filepath
+                 , data-default
 
 executable         packdeps
     if flag(library-only)

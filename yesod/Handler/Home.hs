@@ -1,24 +1,27 @@
 module Handler.Home where
 
 import Import
-import Distribution.Package
+import Distribution.Package hiding (PackageName (..))
 import Yesod.Feed
 import Yesod.AtomFeed
 import Text.Hamlet (shamlet)
 import Text.Lucius (luciusFile)
 import qualified Data.Map as Map
+import Data.HashMap.Strict (HashMap)
+import qualified Data.HashMap.Strict as H
 import Distribution.PackDeps
     ( CheckDepsRes (AllNewest, WontAccept)
-    , checkDeps, getPackage, diName
+    , checkDeps, getPackage
     )
+import Data.Monoid ((<>))
 import Data.Maybe (mapMaybe)
-import Data.Text (unpack)
+import qualified Data.Text as T
 import Data.Time (getCurrentTime, UTCTime)
-import Distribution.Version (withinRange)
+import Distribution.PackDeps.Util (withinRange)
 import Control.Arrow ((&&&))
 import Data.List (sortBy, sort)
 import Data.Ord (comparing)
-import Data.Version (Version)
+import Distribution.PackDeps.Types (Version, PackageName (..))
 import Distribution.Text (display)
 
 getHomeR :: Handler RepHtml
@@ -30,7 +33,7 @@ getFeedR :: Handler RepHtml
 getFeedR = do
     needle <- runInputGet $ ireq textField "needle"
     deep <- isDeep
-    (descs, deps) <- getDeps deep $ unpack needle
+    (descs, deps) <- getDeps deep needle
     let title = "Newer dependencies for " <> needle
     let deepR = (FeedR, [("needle", needle), ("deep", "on")])
     defaultLayout $ do
@@ -38,24 +41,27 @@ getFeedR = do
         let feedR = (if deep then Feed2DeepR else Feed2R) needle
         $(widgetFile "feed")
         atomLink feedR title
+  where
+    fst3 (x, _, _) = x
 
 getFeed2R :: Text -> Handler RepAtomRss
 getFeed2R needle = do
-    (_, deps) <- getDeps False $ unpack needle
+    (_, deps) <- getDeps False needle
     feed2Helper needle deps
 
 getFeed2DeepR :: Text -> Handler RepAtomRss
 getFeed2DeepR needle = do
-    (_, deps) <- getDeps True $ unpack needle
+    (_, deps) <- getDeps True needle
     feed2Helper needle deps
 
 feed2Helper :: Text
-            -> [((String, Version), ([(String, String)], UTCTime))]
+            -> [((Text, Version), (HashMap PackageName Version, UTCTime))]
             -> Handler RepAtomRss
 feed2Helper needle deps = do
     now <- liftIO getCurrentTime
     newsFeed Feed
         { feedTitle = "Newer dependencies for " <> needle
+        , feedAuthor = "PackDeps"
         , feedLinkSelf = Feed2R needle
         , feedLinkHome = HomeR
         , feedUpdated = now
@@ -65,15 +71,15 @@ feed2Helper needle deps = do
         }
   where
     go' ((name, version), (deps', time)) = FeedEntry
-        { feedEntryLink = Feed3R needle (pack name) (pack $ display version) (pack $ show time)
+        { feedEntryLink = Feed3R needle name (pack $ show version) (pack $ show time)
         , feedEntryUpdated = time
-        , feedEntryTitle = pack $ "Outdated dependencies for " <> name <> " " <> display version
+        , feedEntryTitle = "Outdated dependencies for " <> name <> " " <> pack (show version)
         , feedEntryContent = [shamlet|
 <table border=1>
-    $forall d <- deps'
+    $forall d <- H.toList deps'
         <tr>
-            <th>#{fst d}
-            <td>#{snd d}
+            <th>#{unPackageName $ fst d}
+            <td>#{show $ snd d}
 |]
         }
 
@@ -85,22 +91,22 @@ getSpecificR :: Handler RepHtml
 getSpecificR = do
     packages' <- lookupGetParams "package"
     (newest, _) <- getData
-    let packages = map (id &&& flip getPackage newest) $ map unpack packages'
-    let title = "Newer dependencies for your Hackage packages"
+    let packages = map (id &&& flip getPackage newest) $ map PackageName packages'
+    let title = "Newer dependencies for your Hackage packages" :: Text
     let checkDeps' x =
             case checkDeps newest x of
                 (_, _, AllNewest) -> Nothing
                 (_, v, WontAccept cd _) -> Just (v, cd)
     defaultLayout $ do
         setTitle $ toHtml title
-        let feedR = SpecificFeedR $ pack $ unwords $ map unpack packages'
+        let feedR = SpecificFeedR $ T.unwords packages'
         $(widgetFile "specific")
         atomLink feedR title
 
 getSpecificFeedR :: Text -> Handler RepAtomRss
 getSpecificFeedR packages' = do
     (newest, _) <- getData
-    let descs = mapMaybe (flip getPackage newest) $ words $ unpack packages'
+    let descs = mapMaybe (flip getPackage newest . PackageName) $ T.words packages'
     let go (_, _, AllNewest) = Nothing
         go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
@@ -108,6 +114,7 @@ getSpecificFeedR packages' = do
     now <- liftIO getCurrentTime
     newsFeed Feed
         { feedTitle = "Newer dependencies for Hackage packages"
+        , feedAuthor = "PackDeps"
         , feedLinkSelf = SpecificFeedR packages'
         , feedLinkHome = HomeR
         , feedUpdated = now
@@ -117,15 +124,15 @@ getSpecificFeedR packages' = do
         }
   where
     go' ((name, version), (deps, time)) = FeedEntry
-        { feedEntryLink = Feed3R packages' (pack name) (pack $ display version) (pack $ show time)
+        { feedEntryLink = Feed3R packages' name (pack $ show version) (pack $ show time)
         , feedEntryUpdated = time
-        , feedEntryTitle = pack $ "Outdated dependencies for " <> name <> " " <> display version
+        , feedEntryTitle = "Outdated dependencies for " <> name <> " " <> pack (show version)
         , feedEntryContent = [shamlet|
 <table border=1>
-    $forall d <- deps
+    $forall d <- H.toList deps
         <tr>
-            <th>#{fst d}
-            <td>#{snd d}
+            <th>#{unPackageName $ fst d}
+            <td>#{show $ snd d}
 |]
         }
 
@@ -138,14 +145,14 @@ getReverseListR = do
         $(widgetFile "reverselist")
   where
     getOutdated (version, pairs) =
-        case filter (not . withinRange version . snd) pairs of
+        case filter (not . withinRange version . snd) $ H.toList pairs of
             [] -> Nothing
             ps -> Just $ show $ length ps
 
 getReverseR :: Text -> Handler RepHtml
 getReverseR dep = do
     (_, reverse') <- getData
-    (version, rels) <- maybe notFound return $ Map.lookup (unpack dep) reverse'
+    (version, rels) <- maybe notFound return $ H.lookup (PackageName dep) reverse'
     defaultLayout $ do
         setTitle [shamlet|Reverse dependencies for #{dep}|]
         toWidget $(luciusFile "templates/home.lucius")

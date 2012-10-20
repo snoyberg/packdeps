@@ -3,7 +3,9 @@ import Control.Monad (forM_)
 import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess)
 import Distribution.Text (display)
-import Distribution.Package (PackageName (PackageName))
+import Distribution.PackDeps.Types (PackageName (PackageName))
+import Data.Text (unpack)
+import qualified Data.HashMap.Strict as HMap
 
 main :: IO ()
 main = do
@@ -29,7 +31,7 @@ run args = do
                 putStrLn $ concat
                     [ unPackageName pn
                     , "-"
-                    , display v
+                    , show v
                     , ": Can use newest versions of all dependencies"
                     ]
                 return True
@@ -37,10 +39,10 @@ run args = do
                 putStrLn $ concat
                     [ unPackageName pn
                     , "-"
-                    , display v
+                    , show v
                     , ": Cannot accept the following packages"
                     ]
-                forM_ p $ \(x, y) -> putStrLn $ x ++ " " ++ y
+                forM_ (HMap.toList p) $ \(x, y) -> putStrLn $ unPackageName x ++ " " ++ show y
                 return False
         putStrLn ""
         if allGood
@@ -48,8 +50,7 @@ run args = do
             else exitFailure
 
 unPackageName :: PackageName -> String
-unPackageName (PackageName n) = n
-
+unPackageName (PackageName n) = unpack n
 
 usageExit :: IO a
 usageExit = do
