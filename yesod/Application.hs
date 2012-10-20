@@ -27,6 +27,7 @@ import Distribution.Version (VersionRange)
 import Network.HTTP.Conduit
 import Data.Conduit (($$+-))
 import Data.Conduit.Binary (sinkFile)
+import System.IO (hPutStrLn, stderr, hFlush)
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -51,22 +52,28 @@ makeApplication conf = do
 loadData :: ((Newest, Reverses) -> IO ())
          -> IO ()
 loadData update' = do
-    putStrLn "Entered loadData"
+    let log s = hPutStrLn stderr s >> hFlush stderr
+    log "Entered loadData"
     req' <- parseUrl "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
-    let req = req' { decompress = alwaysDecompress }
+    let req = req' { decompress = alwaysDecompress, responseTimeout = Just 30000000 }
     forever $ do
-        putStrLn "In forever"
+        log "In forever"
         res <- try $ do
             withManager $ \m -> do
                 res <- http req m
+                liftIO $ log "Received response headers"
                 responseBody res $$+- sinkFile "tmp"
-            putStrLn "Finished writing"
+            log "Finished writing"
             !newest <- fmap (newestFromIds . newestToIds) $ loadNewestFrom "tmp"
-            let reverses = getReverses newest
+            log "Finished parsing"
+            !reverses <- return $! getReverses newest
+            log "Finished making reverses"
             update' (newest, reverses)
+            log "Updated"
             threadDelay $ 1000 * 1000 * 60 * 60
         case res of
             Left (e :: SomeException) -> do
+                log $ "Received exception: " ++ show e
                 threadDelay $ 1000 * 1000 * 30
             Right () -> return ()
 
