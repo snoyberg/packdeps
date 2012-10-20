@@ -260,3 +260,12 @@ instance Show (VersionRange Version) where
         Prelude.show . unVR
       where
         unVR AnyVersion = D.AnyVersion
+        unVR (ThisVersion v) = D.ThisVersion (unV v)
+        unVR (LaterVersion v) = D.LaterVersion (unV v)
+        unVR (EarlierVersion v) = D.EarlierVersion (unV v)
+        unVR (WildcardVersion v) = D.WildcardVersion (unV v)
+        unVR (UnionVersionRanges x y) = D.UnionVersionRanges (unVR x) (unVR y)
+        unVR (IntersectVersionRanges x y) = D.IntersectVersionRanges (unVR x) (unVR y)
+        unVR (VersionRangeParens x) = D.VersionRangeParens (unVR x)
+
+        unV (Version x y) = D.Version (unpack x) (map unpack $ unpack y)

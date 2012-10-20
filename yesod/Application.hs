@@ -57,11 +57,9 @@ loadData update' = do
     forever $ do
         putStrLn "In forever"
         res <- try $ do
-            {-
             withManager $ \m -> do
                 res <- http req m
                 responseBody res $$+- sinkFile "tmp"
-            -}
             putStrLn "Finished writing"
             !newest <- fmap (newestFromIds . newestToIds) $ loadNewestFrom "tmp"
             let reverses = getReverses newest
