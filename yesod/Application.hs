@@ -28,6 +28,8 @@ import Network.HTTP.Conduit
 import Data.Conduit (($$+-))
 import Data.Conduit.Binary (sinkFile)
 import System.IO (hPutStrLn, stderr, hFlush)
+import qualified Data.ByteString.Lazy as L
+import qualified Data.Binary
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -69,6 +71,7 @@ loadData update' = do
             !reverses <- return $! getReverses newest
             log "Finished making reverses"
             update' (newest, reverses)
+            _ <- forkIO $ L.writeFile cacheFile $ Data.Binary.encode newest
             log "Updated"
             threadDelay $ 1000 * 1000 * 60 * 60
         case res of
@@ -77,10 +80,23 @@ loadData update' = do
                 threadDelay $ 1000 * 1000 * 30
             Right () -> return ()
 
+cacheFile :: FilePath
+cacheFile = "/tmp/packdeps-cache.bin"
+
 makeFoundation :: AppConfig DefaultEnv Extra -> IO App
 makeFoundation conf = do
     s <- staticSite
-    idata <- I.newIORef Nothing
+    edata <- try $ do
+        lbs <- L.readFile cacheFile
+        !newest <- return $! Data.Binary.decode lbs
+        return $! newest
+    mdata <-
+        case edata of
+            Left (e :: SomeException) -> do
+                hPutStrLn stderr $ "Failed initial load: " ++ show e
+                return Nothing
+            Right x -> return $ Just (x, getReverses x)
+    idata <- I.newIORef mdata
     return $ App conf s idata
 
 -- for yesod devel
