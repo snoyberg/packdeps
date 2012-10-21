@@ -257,7 +257,7 @@ m'ToM (Just' a) = Just a
 
 instance Show (VersionRange Version) where
     show =
-        Prelude.show . unVR
+        display . unVR
       where
         unVR AnyVersion = D.AnyVersion
         unVR (ThisVersion v) = D.ThisVersion (unV v)
