@@ -5,7 +5,7 @@
     <tr>
         <th>#{show $ H.size rels} Reverse #{plural (H.size rels) "dep" "deps"}
         <th>Accepted versions
-    $forall rel <- H.toList rels
+    $forall rel <- sortByName $ H.toList rels
         <tr>
             $if H.member (fst rel) reverse'
                 <td>

@@ -8,7 +8,7 @@ $forall p <- packages
         $maybe x <- checkDeps' descinfo
             <h3>#{unPackageName $ fst p}-#{show (fst x)}
             <table>
-                $forall p <- H.toList $ snd x
+                $forall p <- sortByName $ H.toList $ snd x
                     <tr>
                         <th>#{unPackageName $ fst p}
                         <td>#{show $ snd p}

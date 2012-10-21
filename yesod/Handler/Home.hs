@@ -161,3 +161,10 @@ getReverseR dep = do
     plural :: Int -> String -> String -> String
     plural 1 s _ = s
     plural _ _ pl = pl
+
+sortByName :: [(PackageName, a)] -> [(PackageName, a)]
+sortByName =
+    map snd . sortBy (comparing fst) . map (\(x, y) -> (T.toCaseFold $ unPackageName x, (x, y)))
+
+sortCI :: [PackageName] -> [PackageName]
+sortCI = map snd . sortBy (comparing fst) . map (\t -> (T.toCaseFold $ unPackageName t, t))

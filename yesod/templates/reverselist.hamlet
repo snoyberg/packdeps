@@ -5,7 +5,7 @@
         <th>Package
         <th>Total Dependencies
         <th>Total Outdated Dependencies
-    $forall p <- H.toList reverse'
+    $forall p <- sortByName $ H.toList reverse'
         <tr>
             <td>
                 <a href=@{ReverseR $ unPackageName $ fst p}>#{unPackageName $ fst p}
