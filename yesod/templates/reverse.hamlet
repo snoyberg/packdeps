@@ -12,5 +12,5 @@
                     <a href=@{ReverseR $ unPackageName $ fst rel}>#{unPackageName $ fst rel}
             $else
                 <td>#{unPackageName $ fst rel}
-            <td :withinRange version (snd rel):style="background-color:#fbb">
+            <td :not $ withinRange version (snd rel):style="background-color:#fbb">
                 <a href="http://hackage.haskell.org/package/#{unPackageName $ fst rel}">#{show (snd rel)}
