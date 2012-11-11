@@ -162,7 +162,9 @@ getDeps x = HMap.fromList
           $ map (\(Dependency (D.PackageName k) v) -> (PackageName $ pack k, convertVersionRange v))
           $ concat
           $ maybe id ((:) . condTreeConstraints) (condLibrary x)
-          $ map (condTreeConstraints . snd) (condExecutables x)
+          $ map (condTreeConstraints . snd) (condExecutables x) ++
+            map (condTreeConstraints . snd) (condTestSuites x) ++
+            map (condTreeConstraints . snd) (condBenchmarks x)
 
 convertVersionRange :: D.VersionRange -> VersionRange Version
 convertVersionRange =

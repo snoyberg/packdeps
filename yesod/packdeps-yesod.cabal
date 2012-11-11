@@ -87,7 +87,7 @@ library
                  , binary
                  , unordered-containers
                  , ghc-prim
-                 , classy-prelude-conduit
+                 , classy-prelude-conduit >= 0.4
                  , filepath
                  , data-default
 

@@ -9,10 +9,9 @@ import Prelude (show)
 import Distribution.Text (display)
 import qualified Distribution.Version as D
 import qualified Data.HashMap.Strict as H
-import Data.Vector (replicateM, (!))
+import Data.Vector ((!))
 
 import Data.Binary
-import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Control.Monad.Trans.RWS as RWS
 import Control.Monad.Trans.RWS hiding (get, put)
 import Data.Hashable (hashWithSalt)
