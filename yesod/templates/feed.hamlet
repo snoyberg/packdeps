@@ -18,8 +18,15 @@ $if not deep
     <p>
         <a href=@?{deepR}>View outdated dependency for all ancestor packages too.
 <h3>Packages checked
-<div .packages>
-    <ol>
-        $forall name <- sortCI $ map fst3 descs
-            <li>
-                <a href=http://hackage.haskell.org/package/#{unPackageName name}>#{unPackageName name}
+$if null descs
+    <p>No packages checked
+$elseif null $ drop 1 descs
+    $forall name <- sortCI $ map fst3 descs
+        <p>
+            <a href=http://hackage.haskell.org/package/#{unPackageName name}>#{unPackageName name}
+$else
+    <div .packages>
+        <ol>
+            $forall name <- sortCI $ map fst3 descs
+                <li>
+                    <a href=http://hackage.haskell.org/package/#{unPackageName name}>#{unPackageName name}
