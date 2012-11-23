@@ -57,7 +57,7 @@ library
                  , yesod-core                    >= 1.1        && < 1.2
                  , yesod-static                  >= 1.1        && < 1.2
                  , yesod-default                 >= 1.1        && < 1.2
-                 , yesod-form                    >= 1.1        && < 1.2
+                 , yesod-form                    >= 1.1        && < 1.3
                  , yesod-newsfeed                >= 1.1        && < 1.2
                  , clientsession
                  , bytestring                    >= 0.9        && < 0.10
@@ -65,7 +65,7 @@ library
                  , template-haskell
                  , hamlet                        >= 1.1        && < 1.2
                  , shakespeare-css               >= 1.0        && < 1.1
-                 , shakespeare-js                >= 1.0        && < 1.1
+                 , shakespeare-js                >= 1.0        && < 1.2
                  , shakespeare-text              >= 1.0        && < 1.1
                  , monad-control                 >= 0.3        && < 0.4
                  , wai-extra                     >= 1.3        && < 1.4

@@ -38,6 +38,7 @@ import Control.Monad (join)
 
 import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
+import Data.Monoid (mempty, mconcat)
 
 import Distribution.Package hiding (PackageName)
 import qualified Distribution.Package as D
@@ -158,13 +159,31 @@ getDescInfo gpd = DescInfo
     pi'@(PackageIdentifier (D.PackageName name) version) = package p
 
 getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (VersionRange Version)
-getDeps x = HMap.fromList
-          $ map (\(Dependency (D.PackageName k) v) -> (PackageName $ pack k, convertVersionRange v))
-          $ concat
-          $ maybe id ((:) . condTreeConstraints) (condLibrary x)
-          $ map (condTreeConstraints . snd) (condExecutables x) ++
-            map (condTreeConstraints . snd) (condTestSuites x) ++
-            map (condTreeConstraints . snd) (condBenchmarks x)
+getDeps gpd = HMap.fromList
+            $ map (\(Dependency (D.PackageName k) v) -> (PackageName $ pack k, convertVersionRange v))
+            $ mconcat
+                [ maybe mempty go $ condLibrary gpd
+                , mconcat $ map (go . snd) $ condExecutables gpd
+                , mconcat $ map (go . snd) $ condTestSuites gpd
+                , mconcat $ map (go . snd) $ condBenchmarks gpd
+                ]
+  where
+    go tree = concat
+            $ condTreeConstraints tree
+            : map go (mapMaybe checkCond $ condTreeComponents tree)
+
+    checkCond (cond, tree, melse)
+        | checkCond' cond = Just tree
+        | otherwise = melse
+
+    checkCond' (Var (OS _)) = True
+    checkCond' (Var (Arch _)) = True
+    checkCond' (Var (Flag _)) = False
+    checkCond' (Var (Impl compiler range)) = True
+    checkCond' (Lit b) = b
+    checkCond' (CNot c) = not $ checkCond' c
+    checkCond' (COr c1 c2) = checkCond' c1 || checkCond' c2
+    checkCond' (CAnd c1 c2) = checkCond' c1 && checkCond' c2
 
 convertVersionRange :: D.VersionRange -> VersionRange Version
 convertVersionRange =
