@@ -168,14 +168,15 @@ getDeps gpd = HMap.fromList
                 , mconcat $ map (go . snd) $ condBenchmarks gpd
                 ]
   where
-    flags = map flagName $ genPackageFlags gpd
     flagMaps =
-        loop flags
+        loop $ genPackageFlags gpd
       where
         loop [] = return Map.empty
         loop (f:fs) = do
+            let name = flagName f
+                def = flagDefault f
             rest <- loop fs
-            [Map.insert f True rest, Map.insert f False rest]
+            [Map.insert name def rest, Map.insert name (not def) rest]
 
     go :: CondTree ConfVar [Dependency] a -> [Dependency]
     go tree =
