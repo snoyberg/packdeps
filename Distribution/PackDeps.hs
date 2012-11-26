@@ -32,7 +32,7 @@ import System.FilePath ((</>))
 import qualified Data.Map as Map
 import Data.List (foldl', group, sort, isPrefixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
-import Data.Maybe (mapMaybe, catMaybes)
+import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
 import Control.Exception (throw)
 import Control.Monad (join)
 
@@ -168,22 +168,53 @@ getDeps gpd = HMap.fromList
                 , mconcat $ map (go . snd) $ condBenchmarks gpd
                 ]
   where
-    go tree = concat
-            $ condTreeConstraints tree
-            : map go (mapMaybe checkCond $ condTreeComponents tree)
+    flags = map flagName $ genPackageFlags gpd
+    flagMaps =
+        loop flags
+      where
+        loop [] = return Map.empty
+        loop (f:fs) = do
+            rest <- loop fs
+            [Map.insert f True rest, Map.insert f False rest]
 
-    checkCond (cond, tree, melse)
-        | checkCond' cond = Just tree
+    go :: CondTree ConfVar [Dependency] a -> [Dependency]
+    go tree =
+        case filter allowsBase46 choices of
+            [] ->
+                case choices of
+                    [] -> []
+                    c:_ -> c
+            c:_ -> c
+      where
+        choices = map (flip go' tree) flagMaps
+
+    allowsBase46 :: [Dependency] -> Bool
+    allowsBase46 =
+        all ok
+      where
+        Just base46 = simpleParse "4.6.0.0"
+
+        ok :: Dependency -> Bool
+        ok (Dependency (D.PackageName "base") range) = base46 `D.withinRange` range
+        ok _ = True
+
+    go' flagMap tree
+        = concat
+        $ condTreeConstraints tree
+        : map (go' flagMap) (mapMaybe (checkCond flagMap) $ condTreeComponents tree)
+
+    checkCond flagMap (cond, tree, melse)
+        | checkCond' flagMap cond = Just tree
         | otherwise = melse
 
-    checkCond' (Var (OS _)) = True
-    checkCond' (Var (Arch _)) = True
-    checkCond' (Var (Flag _)) = False
-    checkCond' (Var (Impl compiler range)) = True
-    checkCond' (Lit b) = b
-    checkCond' (CNot c) = not $ checkCond' c
-    checkCond' (COr c1 c2) = checkCond' c1 || checkCond' c2
-    checkCond' (CAnd c1 c2) = checkCond' c1 && checkCond' c2
+    checkCond' _ (Var (OS _)) = True
+    checkCond' _ (Var (Arch _)) = True
+    checkCond' flagMap (Var (Flag f)) = fromMaybe False $ Map.lookup f flagMap
+    checkCond' _ (Var (Impl compiler range)) = True
+    checkCond' _ (Lit b) = b
+    checkCond' flagMap (CNot c) = not $ checkCond' flagMap c
+    checkCond' flagMap (COr c1 c2) = checkCond' flagMap c1 || checkCond' flagMap c2
+    checkCond' flagMap (CAnd c1 c2) = checkCond' flagMap c1 && checkCond' flagMap c2
 
 convertVersionRange :: D.VersionRange -> VersionRange Version
 convertVersionRange =
