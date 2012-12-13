@@ -15,3 +15,6 @@
 
 /reverse ReverseListR GET
 /reverse/#Text ReverseR GET
+
+/licenses LicensesR GET
+/licenses/#Text LicenseR GET

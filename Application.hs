@@ -18,10 +18,10 @@ import Control.Exception (SomeException, try)
 import Control.Concurrent (forkIO, threadDelay)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as S8
-import Distribution.PackDeps (Newest, Reverses, loadNewestFrom, getReverses, DescInfo)
+import Distribution.PackDeps (Newest, Reverses, loadNewestFrom, getReverses, DescInfo, getLicenseMap)
 import Distribution.PackDeps.Types
 import Control.Monad (forever)
-import Control.DeepSeq (NFData (rnf), deepseq)
+import Control.DeepSeq (NFData (rnf), deepseq, ($!!))
 import Data.Version (Version (..))
 import Distribution.Version (VersionRange)
 import Network.HTTP.Conduit
@@ -34,6 +34,7 @@ import qualified Data.Binary
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
 import Handler.Home
+import Handler.License
 
 -- This line actually creates our YesodSite instance. It is the second half
 -- of the call to mkYesodData which occurs in Foundation.hs. Please see
@@ -51,7 +52,7 @@ makeApplication conf = do
     _ <- forkIO $ loadData $ I.writeIORef (appData foundation) . Just
     return app
 
-loadData :: ((Newest, Reverses) -> IO ())
+loadData :: ((Newest, Reverses, LicenseMap) -> IO ())
          -> IO ()
 loadData update' = do
     let log s = hPutStrLn stderr s >> hFlush stderr
@@ -70,7 +71,9 @@ loadData update' = do
             log "Finished parsing"
             !reverses <- return $! getReverses newest
             log "Finished making reverses"
-            update' (newest, reverses)
+            !licenses <- return $!! getLicenseMap newest
+            log "Finished making license map"
+            update' (newest, reverses, licenses)
             _ <- forkIO $ L.writeFile cacheFile $ Data.Binary.encode newest
             log "Updated"
             threadDelay $ 1000 * 1000 * 60 * 60
@@ -95,7 +98,7 @@ makeFoundation conf = do
             Left (e :: SomeException) -> do
                 hPutStrLn stderr $ "Failed initial load: " ++ show e
                 return Nothing
-            Right x -> return $ Just (x, getReverses x)
+            Right x -> return $ Just (x, getReverses x, getLicenseMap x)
     idata <- I.newIORef mdata
     return $ App conf s idata
 

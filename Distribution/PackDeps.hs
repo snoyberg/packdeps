@@ -20,6 +20,8 @@ module Distribution.PackDeps
       -- * Reverse dependencies
     , Reverses
     , getReverses
+      -- * Licenses
+    , getLicenseMap
     ) where
 
 import Prelude
@@ -61,6 +63,7 @@ import Control.Arrow ((&&&))
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Set as Set
+import Control.Monad.Trans.State (State, evalState, get, put)
 
 loadNewest :: IO Newest
 loadNewest = do
@@ -114,14 +117,19 @@ addPackage (Newest m) entry = Newest $
     go package' version =
         case Tar.entryContent entry of
             Tar.NormalFile bs _ ->
-                 HMap.insert package' PackInfo
+                 let p = parsePackage bs
+                  in HMap.insert package' PackInfo
                         { piVersion = version
-                        , piDesc = parsePackage bs
+                        , piDesc = fmap fst p
                         , piEpoch = Tar.entryTime entry
+                        , piLicense =
+                            case p of
+                                Nothing' -> License "Unknown"
+                                Just' (_, l) -> l
                         } m
             _ -> m
 
-maxVersion :: Ord v => PackInfo n v -> PackInfo n v -> PackInfo n v
+maxVersion :: Ord v => PackInfo n v l -> PackInfo n v l -> PackInfo n v l
 maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
 
 getReverses :: Newest -> Reverses
@@ -148,12 +156,12 @@ getReverses (Newest newest) =
             Nothing -> Nothing
             Just PackInfo { piVersion = v} -> Just (dep, (v, rels))
 
-getDescInfo :: GenericPackageDescription -> DescInfo PackageName Version
-getDescInfo gpd = DescInfo
+getDescInfo :: GenericPackageDescription -> (DescInfo PackageName Version, License)
+getDescInfo gpd = (DescInfo
     { diHaystack = toCaseFold $ pack $ author p ++ maintainer p ++ name
     , diDeps = getDeps gpd
     , diSynopsis = pack $ synopsis p
-    }
+    }, License $ pack $ display $ license $ packageDescription gpd)
   where
     p = packageDescription gpd
     pi'@(PackageIdentifier (D.PackageName name) version) = package p
@@ -272,7 +280,7 @@ getPackage s (Newest n) = do
     return (s, piVersion pi, di)
 
 -- | Parse information on a package from the contents of a cabal file.
-parsePackage :: L.ByteString -> Maybe' (DescInfo PackageName Version)
+parsePackage :: L.ByteString -> Maybe' (DescInfo PackageName Version, License)
 parsePackage lbs =
     case parsePackageDescription $ T.unpack
        $ T.decodeUtf8With T.lenientDecode lbs of
@@ -281,7 +289,7 @@ parsePackage lbs =
 
 -- | Load a single package from a cabal file.
 loadPackage :: FilePath -> IO (Maybe' (DescInfo PackageName Version))
-loadPackage = fmap parsePackage . L.readFile
+loadPackage = fmap (fmap fst . parsePackage) . L.readFile
 
 -- | Find all of the packages matching a given search string.
 filterPackages :: Text -> Newest -> [(PackageName, Version, DescInfo PackageName Version)]
@@ -313,3 +321,43 @@ deepDeps (Newest newest) dis0 =
             pi <- HMap.lookup name newest
             di <- m'ToM $ piDesc pi
             return (name, piVersion pi, di)
+
+data LMS = LMS
+    { lmsProcessed :: Set.Set PackageName
+    , lmsToProcess :: [PackageName]
+    , lmsResult :: LicenseMap
+    }
+
+getLicenseMap :: Newest -> LicenseMap
+getLicenseMap (Newest newest) =
+    evalState go (LMS Set.empty (HMap.keys newest) Map.empty)
+  where
+    go = do
+        lms <- get
+        case lmsToProcess lms of
+            [] -> return $ lmsResult lms
+            p:rest -> do
+                put lms { lmsToProcess = rest }
+                _ <- getLicenses p
+                go
+
+    getLicenses :: PackageName -> State LMS Licenses
+    getLicenses p = do
+        lms1 <- get
+        if p `Set.member` lmsProcessed lms1
+            then return $ fromMaybe mempty $ Map.lookup p $ lmsResult lms1
+            else do
+                put lms1 { lmsProcessed = Set.insert p $ lmsProcessed lms1 }
+                case HMap.lookup p newest of
+                    Nothing -> return mempty
+                    Just pi -> do
+                        let ls1 = Licenses $ Map.singleton (piLicense pi) $ Set.singleton p
+                            deps =
+                                case piDesc pi of
+                                    Nothing' -> []
+                                    Just' di -> HMap.keys $ diDeps di
+                        lss <- mapM getLicenses deps
+                        lms2 <- get
+                        let ls = mconcat $ ls1 : lss
+                        put lms2 { lmsResult = Map.insert p ls $ lmsResult lms2 }
+                        return ls

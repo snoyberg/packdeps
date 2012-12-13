@@ -1,0 +1,17 @@
+<h1>Licenses for #{package}
+<p>
+    <a href=@{LicensesR}>Return to license list
+
+<table>
+    <thead>
+        <tr>
+            <th>License
+            <th>Packages
+    <tbody>
+        $forall (l, ps) <- Map.toList licenses
+            <tr>
+                <td>#{unLicense l}
+                <td>
+                    <ul>
+                        $forall PackageName p <- ps
+                            <li>#{p}

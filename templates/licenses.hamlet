@@ -1,0 +1,18 @@
+<h1>This page lists all packages and their deep license information.
+
+<table>
+    <thead>
+        <tr>
+            <th>Package
+            <th>Licenses
+    <tbody>
+        $forall (package, licenses) <- Map.toList m
+            <tr>
+                <td>
+                    <a href=@{LicenseR $ unPackageName package}>#{unPackageName package}
+                <td>
+                    <ul>
+                        $forall (l, ps) <- Map.toList $ unLicenses licenses
+                            <li>
+                                #{unLicense l}
+                                <i>(#{Set.size ps})

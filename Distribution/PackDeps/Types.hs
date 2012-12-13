@@ -15,6 +15,8 @@ import Data.Binary
 import qualified Control.Monad.Trans.RWS as RWS
 import Control.Monad.Trans.RWS hiding (get, put)
 import Data.Hashable (hashWithSalt)
+import qualified Data.Map as Map
+import Control.DeepSeq
 
 class GBinary f where
     gput :: f a -> Put
@@ -46,6 +48,9 @@ newtype NameId = NameId Word32
     deriving (Binary', Eq, Hashable, Enum, Bounded)
 newtype VersionId = VersionId Word32
     deriving (Binary', Eq, Hashable, Enum, Bounded)
+newtype LicenseId = LicenseId Word32
+    deriving (Binary', Eq, Hashable, Enum, Bounded)
+
 instance Binary' Int64 where
     put' = put
     get' = get
@@ -70,12 +75,12 @@ instance Binary' a => Binary' (Maybe' a) where
         x <- getWord8
         if x == 0 then return Nothing' else Just' <$> get'
 
-data NewestIds = NewestIds !(Vector PackageName) !(Vector Version) !(Vector (NameId, PackInfo NameId VersionId))
+data NewestIds = NewestIds !(Vector PackageName) !(Vector Version) !(Vector License) !(Vector (NameId, PackInfo NameId VersionId LicenseId))
     deriving Generic
 instance Binary NewestIds where
     put = gput . from
     get = to <$> gget
-instance Binary' (PackInfo NameId VersionId) where
+instance Binary' (PackInfo NameId VersionId LicenseId) where
     put' = gput . from
     get' = to <$> gget
 instance Binary' (DescInfo NameId VersionId) where
@@ -97,15 +102,17 @@ instance (Eq k, Hashable k, Binary' k, Binary' v) => Binary' (HashMap k v) where
 data NTI = NTI
     { ntiNextNameId :: NameId
     , ntiNextVersionId :: VersionId
+    , ntiNextLicenseId :: LicenseId
     , ntiNameMap :: HashMap PackageName NameId
     , ntiVersionMap :: HashMap Version VersionId
+    , ntiLicenseMap :: HashMap License LicenseId
     }
 
 newestToIds :: Newest -> NewestIds
 newestToIds (Newest newest) =
-    NewestIds (pack $ namesDL []) (pack $ versionsDL []) (pack pairs)
+    NewestIds (pack $ namesDL []) (pack $ versionsDL []) (pack $ licensesDL []) (pack pairs)
   where
-    (pairs, _, (namesDL, versionsDL)) = runRWS (mapM goPair $ unpack newest) () (NTI minBound minBound empty empty)
+    (pairs, _, (namesDL, versionsDL, licensesDL)) = runRWS (mapM goPair $ unpack newest) () (NTI minBound minBound minBound empty empty empty)
 
     getName name = do
         nti <- RWS.get
@@ -117,7 +124,7 @@ newestToIds (Newest newest) =
                     { ntiNextNameId = succ nid
                     , ntiNameMap = insert name nid $ ntiNameMap nti
                     }
-                tell ((name:), id)
+                tell ((name:), id, id)
                 return nid
 
     getVersion version = do
@@ -130,8 +137,21 @@ newestToIds (Newest newest) =
                     { ntiNextVersionId = succ vid
                     , ntiVersionMap = insert version vid $ ntiVersionMap nti
                     }
-                tell (id, (version:))
+                tell (id, (version:), id)
                 return vid
+
+    getLicense license = do
+        nti <- RWS.get
+        case lookup license $ ntiLicenseMap nti of
+            Just lid -> return lid
+            Nothing -> do
+                let lid = ntiNextLicenseId nti
+                RWS.put nti
+                    { ntiNextLicenseId = succ lid
+                    , ntiLicenseMap = insert license lid $ ntiLicenseMap nti
+                    }
+                tell (id, id, (license:))
+                return lid
 
     goPair (pn, pi) = do
         nid <- getName pn
@@ -140,10 +160,12 @@ newestToIds (Newest newest) =
 
     goPI pi = do
         v <- getVersion $ piVersion pi
+        l <- getLicense $ piLicense pi
         di <- maybe' (return Nothing') (fmap Just' . goDI) $ piDesc pi
         return pi
             { piVersion = v
             , piDesc = di
+            , piLicense = l
             }
 
     goDI di = do
@@ -162,16 +184,18 @@ newestToIds (Newest newest) =
     goVR (VersionRangeParens x) = VersionRangeParens <$> goVR x
 
 newestFromIds :: NewestIds -> Newest
-newestFromIds (NewestIds nameV versionV pairs) =
+newestFromIds (NewestIds nameV versionV licenseV pairs) =
     Newest $ pack $ map goPair $ unpack pairs
   where
     getName (NameId nid) = nameV ! fromIntegral nid
     getVersion (VersionId vid) = versionV ! fromIntegral vid
+    getLicense (LicenseId lid) = licenseV ! fromIntegral lid
     goPair (nid, p) = (getName nid, goPI p)
 
     goPI pi = pi
         { piVersion = getVersion $ piVersion pi
         , piDesc = fmap goDI $ piDesc pi
+        , piLicense = getLicense $ piLicense pi
         }
 
     goDI di = di
@@ -194,14 +218,15 @@ instance Binary Newest where
     get = fmap newestFromIds get
 
 -- | The newest version of every package.
-newtype Newest = Newest { unNewest :: HashMap PackageName (PackInfo PackageName Version) }
+newtype Newest = Newest { unNewest :: HashMap PackageName (PackInfo PackageName Version License) }
 
 type Reverses = HashMap PackageName (Version, HashMap PackageName (VersionRange Version))
 
-data PackInfo name version = PackInfo
+data PackInfo name version license = PackInfo
     { piVersion :: !version
     , piDesc :: !(Maybe' (DescInfo name version))
     , piEpoch :: !Int64
+    , piLicense :: !license
     }
     deriving Generic
 
@@ -236,7 +261,7 @@ data VersionRange version
   deriving (Eq, Generic)
 
 newtype PackageName = PackageName { unPackageName :: Text }
-    deriving (Read, Show, Eq, Ord, Hashable, Binary')
+    deriving (Read, Show, Eq, Ord, Hashable, Binary', NFData)
 
 data Version = Version
     { versionBranch :: !(Vector Int)
@@ -268,3 +293,14 @@ instance Show (VersionRange Version) where
         unVR (VersionRangeParens x) = D.VersionRangeParens (unVR x)
 
         unV (Version x y) = D.Version (unpack x) (map unpack $ unpack y)
+
+newtype License = License { unLicense :: Text }
+    deriving (Show, Eq, Ord, Binary', Hashable, NFData)
+newtype Licenses = Licenses { unLicenses :: (Map License (Set PackageName)) }
+    deriving (NFData)
+
+instance Monoid Licenses where
+    mempty = Licenses mempty
+    Licenses x `mappend` Licenses y = Licenses $ Map.unionWith mappend x y
+
+type LicenseMap = Map PackageName Licenses

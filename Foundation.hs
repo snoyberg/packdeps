@@ -20,7 +20,7 @@ import Settings (widgetFile, Extra (..))
 import Text.Hamlet (hamletFile)
 import Data.Text (Text)
 import Data.IORef (IORef)
-import Distribution.PackDeps (Newest, Reverses)
+import Distribution.PackDeps.Types (Newest, Reverses, LicenseMap)
 
 -- | The site argument for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -29,7 +29,7 @@ import Distribution.PackDeps (Newest, Reverses)
 data App = App
     { settings :: AppConfig DefaultEnv Extra
     , getStatic :: Static -- ^ Settings for static file serving.
-    , appData :: IORef (Maybe (Newest, Reverses))
+    , appData :: IORef (Maybe (Newest, Reverses, LicenseMap))
     }
 
 -- Set up i18n messages. See the message folder.

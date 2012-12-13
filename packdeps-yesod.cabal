@@ -28,6 +28,7 @@ library
                      Settings.StaticFiles
                      Settings.Development
                      Handler.Home
+                     Handler.License
                      Distribution.PackDeps
                      Distribution.PackDeps.Types
                      Distribution.PackDeps.Util

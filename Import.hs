@@ -49,7 +49,7 @@ isDeep = fmap (== Just "on") $ runInputGet $ iopt textField "deep"
 getData :: Handler (Newest, Reverses)
 getData = do
     mdata <- (appData <$> getYesod) >>= liftIO . readIORef
-    maybe (error "Still loading data, please wait") return mdata
+    maybe (error "Still loading data, please wait") (\(a, b, _) -> return (a, b)) mdata
 
 getDeps :: Bool
         -> Text

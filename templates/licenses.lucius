@@ -1,0 +1,25 @@
+table {
+    width: 100%;
+}
+
+td, th {
+    ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    li {
+        display: inline-block;
+        margin-right: 0.5em;
+    }
+    padding: 0.25em;
+    vertical-align: top;
+}
+
+td:first-child, th:first-child {
+    text-align: right;
+}
+
+td, th {
+    text-align: left;
+}
