@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 module Distribution.PackDeps
     ( -- * Data types
       Newest (..)
@@ -40,7 +41,7 @@ import Control.Monad (join)
 
 import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
-import Data.Monoid (mempty, mconcat)
+import Data.Monoid (mempty, mconcat, mappend)
 
 import Distribution.Package hiding (PackageName)
 import qualified Distribution.Package as D
@@ -144,7 +145,7 @@ getReverses (Newest newest) =
 
     combine = unionsWith HMap.union
 
-    toTuple rel (dep, range) = HMap.singleton dep $ HMap.singleton rel range
+    toTuple rel (dep, PUVersionRange _ range) = HMap.singleton dep $ HMap.singleton rel range
 
     hoisted :: HMap.HashMap PackageName (HMap.HashMap PackageName (VersionRange Version))
     hoisted = combine $ map toTuples $ HMap.toList newest
@@ -166,14 +167,14 @@ getDescInfo gpd = (DescInfo
     p = packageDescription gpd
     pi'@(PackageIdentifier (D.PackageName name) version) = package p
 
-getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (VersionRange Version)
-getDeps gpd = HMap.fromList
-            $ map (\(Dependency (D.PackageName k) v) -> (PackageName $ pack k, convertVersionRange v))
+getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange Version)
+getDeps gpd = foldr (HMap.unionWith mappend) HMap.empty
+            $ map (\(Dependency (D.PackageName k) v, pu) -> HMap.singleton (PackageName $ pack k) (PUVersionRange pu $ convertVersionRange v))
             $ mconcat
-                [ maybe mempty go $ condLibrary gpd
-                , mconcat $ map (go . snd) $ condExecutables gpd
-                , mconcat $ map (go . snd) $ condTestSuites gpd
-                , mconcat $ map (go . snd) $ condBenchmarks gpd
+                [ maybe mempty (go Runtime) $ condLibrary gpd
+                , mconcat $ map (go Runtime . snd) $ condExecutables gpd
+                , mconcat $ map (go TestBench . snd) $ condTestSuites gpd
+                , mconcat $ map (go TestBench . snd) $ condBenchmarks gpd
                 ]
   where
     flagMaps =
@@ -186,8 +187,8 @@ getDeps gpd = HMap.fromList
             rest <- loop fs
             [Map.insert name def rest, Map.insert name (not def) rest]
 
-    go :: CondTree ConfVar [Dependency] a -> [Dependency]
-    go tree =
+    go :: PackageUsage -> CondTree ConfVar [Dependency] a -> [(Dependency, PackageUsage)]
+    go pu tree = map (, pu) $
         case filter allowsBase46 choices of
             [] ->
                 case choices of
@@ -261,8 +262,8 @@ data CheckDepsRes = AllNewest
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
-notNewest :: Newest -> (PackageName, VersionRange Version) -> Maybe ((PackageName, Version), Tar.EpochTime)
-notNewest (Newest newest) (s, range) =
+notNewest :: Newest -> (PackageName, PUVersionRange Version) -> Maybe ((PackageName, Version), Tar.EpochTime)
+notNewest (Newest newest) (s, PUVersionRange _ range) =
     case HMap.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
@@ -328,8 +329,9 @@ data LMS = LMS
     , lmsResult :: LicenseMap
     }
 
-getLicenseMap :: Newest -> LicenseMap
-getLicenseMap (Newest newest) =
+getLicenseMap :: Bool -- ^ include test/benchmarks
+              -> Newest -> LicenseMap
+getLicenseMap includeTests (Newest newest) =
     evalState go (LMS Set.empty (HMap.keys newest) Map.empty)
   where
     go = do
@@ -355,9 +357,12 @@ getLicenseMap (Newest newest) =
                             deps =
                                 case piDesc pi of
                                     Nothing' -> []
-                                    Just' di -> HMap.keys $ diDeps di
+                                    Just' di -> map fst $ filter isIncluded $ HMap.toList $ diDeps di
                         lss <- mapM getLicenses deps
                         lms2 <- get
                         let ls = mconcat $ ls1 : lss
                         put lms2 { lmsResult = Map.insert p ls $ lmsResult lms2 }
                         return ls
+
+    isIncluded (_, PUVersionRange Runtime _) = True
+    isIncluded (_, PUVersionRange TestBench _) = includeTests

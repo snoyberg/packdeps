@@ -27,25 +27,40 @@ import Distribution.Text (display)
 import Data.IORef (readIORef)
 import qualified Data.Set as Set
 
-getLicenses :: Handler LicenseMap
+getLicenses :: Handler (LicenseMap, [(Text, Text)])
 getLicenses = do
     mdata <- (appData <$> getYesod) >>= liftIO . readIORef
-    maybe (error "Still loading data, please wait") (\(_, _, c) -> return c) mdata
+    x <- lookupGetParam "include-tests"
+    let includeTests = x == Just "true"
+    maybe (error "Still loading data, please wait") (\(_, _, (notests, withtests)) -> return $
+        if includeTests
+            then (withtests, [("include-tests", "true")])
+            else (notests, [])) mdata
+
+addToggle :: Widget
+addToggle = do
+    x <- lift $ lookupGetParam "include-tests"
+    let includeTests = x == Just "true"
+    if includeTests
+        then [whamlet|<a href="?include-tests=false">Exclude test and benchmark dependencies|]
+        else [whamlet|<a href="?include-tests=true">Include test and benchmark dependencies|]
 
 getLicensesR :: Handler RepHtml
 getLicensesR = do
-    m <- getLicenses
+    (m, params) <- getLicenses
     defaultLayout $ do
         setTitle "Licenses"
+        addToggle
         toWidget $(luciusFile "templates/home.lucius")
         $(widgetFile "licenses")
 
 getLicenseR :: Text -> Handler RepHtml
 getLicenseR package = do
-    m <- getLicenses
+    (m, params) <- getLicenses
     Licenses licenses <- maybe notFound return $ Map.lookup (PackageName package) m
     defaultLayout $ do
         setTitle $ toHtml $ package <> " :: Licenses"
+        addToggle
         toWidget $(luciusFile "templates/home.lucius")
         toWidget $(luciusFile "templates/licenses.lucius")
         $(widgetFile "license")

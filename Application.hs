@@ -52,7 +52,7 @@ makeApplication conf = do
     _ <- forkIO $ loadData $ I.writeIORef (appData foundation) . Just
     return app
 
-loadData :: ((Newest, Reverses, LicenseMap) -> IO ())
+loadData :: ((Newest, Reverses, (LicenseMap, LicenseMap)) -> IO ())
          -> IO ()
 loadData update' = do
     let log s = hPutStrLn stderr s >> hFlush stderr
@@ -71,9 +71,10 @@ loadData update' = do
             log "Finished parsing"
             !reverses <- return $! getReverses newest
             log "Finished making reverses"
-            !licenses <- return $!! getLicenseMap newest
+            !licenses1 <- return $!! getLicenseMap False newest
+            !licenses2 <- return $!! getLicenseMap True newest
             log "Finished making license map"
-            update' (newest, reverses, licenses)
+            update' (newest, reverses, (licenses1, licenses2))
             _ <- forkIO $ L.writeFile cacheFile $ Data.Binary.encode newest
             log "Updated"
             threadDelay $ 1000 * 1000 * 60 * 60
@@ -98,7 +99,7 @@ makeFoundation conf = do
             Left (e :: SomeException) -> do
                 hPutStrLn stderr $ "Failed initial load: " ++ show e
                 return Nothing
-            Right x -> return $ Just (x, getReverses x, getLicenseMap x)
+            Right x -> return $ Just (x, getReverses x, (getLicenseMap False x, getLicenseMap True x))
     idata <- I.newIORef mdata
     return $ App conf s idata
 

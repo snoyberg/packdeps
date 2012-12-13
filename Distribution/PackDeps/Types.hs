@@ -98,6 +98,12 @@ instance Binary' Text where
 instance (Eq k, Hashable k, Binary' k, Binary' v) => Binary' (HashMap k v) where
     put' = put' . asVector . pack . unpack
     get' = pack . unpack . asVector <$> get'
+instance Binary' (PUVersionRange VersionId) where
+    put' = gput . from
+    get' = to <$> gget
+instance Binary' PackageUsage where
+    put' = gput . from
+    get' = to <$> gget
 
 data NTI = NTI
     { ntiNextNameId :: NameId
@@ -172,7 +178,7 @@ newestToIds (Newest newest) =
         deps <- pack <$> mapM goDep (unpack $ diDeps di)
         return di { diDeps = deps }
 
-    goDep (name, vrange) = (,) <$> getName name <*> goVR vrange
+    goDep (name, PUVersionRange pu vrange) = (,) <$> getName name <*> (PUVersionRange pu <$> goVR vrange)
 
     goVR AnyVersion = return AnyVersion
     goVR (ThisVersion v) = ThisVersion <$> getVersion v
@@ -202,7 +208,7 @@ newestFromIds (NewestIds nameV versionV licenseV pairs) =
         { diDeps = pack $ map goPair' $ unpack $ diDeps di
         }
 
-    goPair' (nid, vr) = (getName nid, goVR vr)
+    goPair' (nid, PUVersionRange pu vr) = (getName nid, PUVersionRange pu $ goVR vr)
 
     goVR AnyVersion = AnyVersion
     goVR (ThisVersion v) = ThisVersion $ getVersion v
@@ -242,10 +248,26 @@ maybe' _ f (Just' a) = f a
 -- | Information on a single package.
 data DescInfo name version = DescInfo
     { diHaystack :: !Text
-    , diDeps :: !(HashMap name (VersionRange version))
+    , diDeps :: !(HashMap name (PUVersionRange version))
     , diSynopsis :: !Text
     }
     deriving Generic
+
+data PackageUsage = Runtime | TestBench
+    deriving Generic
+instance Monoid PackageUsage where
+    mempty = TestBench
+    Runtime `mappend` _ = Runtime
+    TestBench `mappend` x = x
+
+data PUVersionRange version = PUVersionRange
+    { puvrPU :: !PackageUsage
+    , puvrVR :: !(VersionRange version)
+    }
+    deriving Generic
+instance Monoid (PUVersionRange version) where
+    mempty = PUVersionRange mempty AnyVersion
+    PUVersionRange a x `mappend` PUVersionRange b y = PUVersionRange (mappend a b) (UnionVersionRanges x y)
 
 -- FIXME add name caching function
 

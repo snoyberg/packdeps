@@ -1,6 +1,6 @@
 <h1>Licenses for #{package}
 <p>
-    <a href=@{LicensesR}>Return to license list
+    <a href=@?{(LicensesR, params)}>Return to license list
 
 <table>
     <thead>

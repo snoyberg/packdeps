@@ -29,7 +29,7 @@ import Distribution.PackDeps.Types (Newest, Reverses, LicenseMap)
 data App = App
     { settings :: AppConfig DefaultEnv Extra
     , getStatic :: Static -- ^ Settings for static file serving.
-    , appData :: IORef (Maybe (Newest, Reverses, LicenseMap))
+    , appData :: IORef (Maybe (Newest, Reverses, (LicenseMap, LicenseMap)))
     }
 
 -- Set up i18n messages. See the message folder.

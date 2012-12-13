@@ -9,7 +9,7 @@
         $forall (package, licenses) <- Map.toList m
             <tr>
                 <td>
-                    <a href=@{LicenseR $ unPackageName package}>#{unPackageName package}
+                    <a href=@?{(LicenseR $ unPackageName package, params)}>#{unPackageName package}
                 <td>
                     <ul>
                         $forall (l, ps) <- Map.toList $ unLicenses licenses
