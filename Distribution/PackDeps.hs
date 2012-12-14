@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Distribution.PackDeps
     ( -- * Data types
       Newest (..)
@@ -65,6 +66,7 @@ import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Set as Set
 import Control.Monad.Trans.State (State, evalState, get, put)
+import Control.Lens
 
 loadNewest :: IO Newest
 loadNewest = do
@@ -324,10 +326,11 @@ deepDeps (Newest newest) dis0 =
             return (name, piVersion pi, di)
 
 data LMS = LMS
-    { lmsProcessed :: Set.Set PackageName
-    , lmsToProcess :: [PackageName]
-    , lmsResult :: LicenseMap
+    { _lmsProcessed :: Set.Set PackageName
+    , _lmsToProcess :: [PackageName]
+    , _lmsResult :: LicenseMap
     }
+makeLenses ''LMS
 
 getLicenseMap :: Bool -- ^ include test/benchmarks
               -> Newest -> LicenseMap
@@ -336,20 +339,20 @@ getLicenseMap includeTests (Newest newest) =
   where
     go = do
         lms <- get
-        case lmsToProcess lms of
-            [] -> return $ lmsResult lms
+        case lms ^. lmsToProcess of
+            [] -> return $ lms ^. lmsResult
             p:rest -> do
-                put lms { lmsToProcess = rest }
+                lmsToProcess %= const rest
                 _ <- getLicenses p
                 go
 
     getLicenses :: PackageName -> State LMS Licenses
     getLicenses p = do
         lms1 <- get
-        if p `Set.member` lmsProcessed lms1
-            then return $ fromMaybe mempty $ Map.lookup p $ lmsResult lms1
+        if p `Set.member` (lms1 ^. lmsProcessed)
+            then return $ fromMaybe mempty $ Map.lookup p $ lms1 ^. lmsResult
             else do
-                put lms1 { lmsProcessed = Set.insert p $ lmsProcessed lms1 }
+                lmsProcessed %= Set.insert p
                 case HMap.lookup p newest of
                     Nothing -> return mempty
                     Just pi -> do
@@ -359,9 +362,8 @@ getLicenseMap includeTests (Newest newest) =
                                     Nothing' -> []
                                     Just' di -> map fst $ filter isIncluded $ HMap.toList $ diDeps di
                         lss <- mapM getLicenses deps
-                        lms2 <- get
                         let ls = mconcat $ ls1 : lss
-                        put lms2 { lmsResult = Map.insert p ls $ lmsResult lms2 }
+                        lmsResult %= Map.insert p ls
                         return ls
 
     isIncluded (_, PUVersionRange Runtime _) = True

@@ -90,6 +90,7 @@ library
                  , classy-prelude-conduit >= 0.4
                  , filepath
                  , data-default
+                 , lens
 
 executable         packdeps
     if flag(library-only)
