@@ -169,9 +169,10 @@ getDescInfo gpd = (DescInfo
     p = packageDescription gpd
     pi'@(PackageIdentifier (D.PackageName name) version) = package p
 
-getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange Version)
-getDeps gpd = foldr (HMap.unionWith mappend) HMap.empty
-            $ map (\(Dependency (D.PackageName k) v, pu) -> HMap.singleton (PackageName $ pack k) (PUVersionRange pu $ convertVersionRange v))
+getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange (VersionRange Version))
+getDeps gpd = HMap.map (fmap convertVersionRange)
+            $ foldr (HMap.unionWith mappend) HMap.empty
+            $ map (\(Dependency (D.PackageName k) v, pu) -> HMap.singleton (PackageName $ pack k) (PUVersionRange pu v))
             $ mconcat
                 [ maybe mempty (go Runtime) $ condLibrary gpd
                 , mconcat $ map (go Runtime . snd) $ condExecutables gpd
@@ -228,22 +229,6 @@ getDeps gpd = foldr (HMap.unionWith mappend) HMap.empty
     checkCond' flagMap (COr c1 c2) = checkCond' flagMap c1 || checkCond' flagMap c2
     checkCond' flagMap (CAnd c1 c2) = checkCond' flagMap c1 && checkCond' flagMap c2
 
-convertVersionRange :: D.VersionRange -> VersionRange Version
-convertVersionRange =
-    goR
-  where
-    goR D.AnyVersion = AnyVersion
-    goR (D.ThisVersion x) = ThisVersion $ convertVersion x
-    goR (D.LaterVersion x) = LaterVersion $ convertVersion x
-    goR (D.EarlierVersion x) = EarlierVersion $ convertVersion x
-    goR (D.WildcardVersion x) = WildcardVersion $ convertVersion x
-    goR (D.UnionVersionRanges x y) = UnionVersionRanges (goR x) (goR y)
-    goR (D.IntersectVersionRanges x y) = IntersectVersionRanges (goR x) (goR y)
-    goR (D.VersionRangeParens x) = VersionRangeParens $ goR x
-
-convertVersion :: D.Version -> Version
-convertVersion (D.Version x y) = Version (Vector.fromList x) (Vector.fromList $ map pack y)
-
 checkDeps :: Newest
           -> (PackageName, Version, DescInfo PackageName Version)
           -> (PackageName, Version, CheckDepsRes)
@@ -264,7 +249,7 @@ data CheckDepsRes = AllNewest
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
-notNewest :: Newest -> (PackageName, PUVersionRange Version) -> Maybe ((PackageName, Version), Tar.EpochTime)
+notNewest :: Newest -> (PackageName, PUVersionRange (VersionRange Version)) -> Maybe ((PackageName, Version), Tar.EpochTime)
 notNewest (Newest newest) (s, PUVersionRange _ range) =
     case HMap.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)

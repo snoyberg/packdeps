@@ -1,11 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude, GeneralizedNewtypeDeriving, RecordWildCards, OverloadedStrings, DeriveGeneric, FlexibleInstances, TypeOperators #-}
 module Distribution.PackDeps.Types where
 
+import Control.Exception (assert)
 import ClassyPrelude.Conduit
 import GHC.Generics
 import Prelude (zip)
 
-import Prelude (show)
+import Prelude (show, tail)
 import Distribution.Text (display)
 import qualified Distribution.Version as D
 import qualified Data.HashMap.Strict as H
@@ -98,7 +99,7 @@ instance Binary' Text where
 instance (Eq k, Hashable k, Binary' k, Binary' v) => Binary' (HashMap k v) where
     put' = put' . asVector . pack . unpack
     get' = pack . unpack . asVector <$> get'
-instance Binary' (PUVersionRange VersionId) where
+instance Binary' (PUVersionRange (VersionRange VersionId)) where
     put' = gput . from
     get' = to <$> gget
 instance Binary' PackageUsage where
@@ -248,7 +249,7 @@ maybe' _ f (Just' a) = f a
 -- | Information on a single package.
 data DescInfo name version = DescInfo
     { diHaystack :: !Text
-    , diDeps :: !(HashMap name (PUVersionRange version))
+    , diDeps :: !(HashMap name (PUVersionRange (VersionRange version)))
     , diSynopsis :: !Text
     }
     deriving Generic
@@ -260,14 +261,16 @@ instance Monoid PackageUsage where
     Runtime `mappend` _ = Runtime
     TestBench `mappend` x = x
 
-data PUVersionRange version = PUVersionRange
+data PUVersionRange vr = PUVersionRange
     { puvrPU :: !PackageUsage
-    , puvrVR :: !(VersionRange version)
+    , puvrVR :: !vr
     }
     deriving Generic
-instance Monoid (PUVersionRange version) where
-    mempty = PUVersionRange mempty AnyVersion
-    PUVersionRange a x `mappend` PUVersionRange b y = PUVersionRange (mappend a b) (UnionVersionRanges x y)
+instance Monoid (PUVersionRange D.VersionRange) where
+    mempty = PUVersionRange mempty D.AnyVersion
+    PUVersionRange a x `mappend` PUVersionRange b y = PUVersionRange (mappend a b) (D.simplifyVersionRange $ D.IntersectVersionRanges x y)
+instance Functor PUVersionRange where
+    fmap f (PUVersionRange x y) = PUVersionRange x (f y)
 
 -- FIXME add name caching function
 

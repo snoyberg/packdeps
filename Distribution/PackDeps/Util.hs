@@ -4,6 +4,7 @@ module Distribution.PackDeps.Util where
 import ClassyPrelude.Conduit
 import Distribution.PackDeps.Types
 import qualified Data.Vector as Vector
+import qualified Distribution.Version as D
 
 withinRange :: Version -> VersionRange Version -> Bool
 withinRange v = foldVersionRange
@@ -81,3 +82,19 @@ wildcardUpperBound (Version lowerBound ts) = (Version upperBound ts)
 
 orLaterVersion :: Version -> VersionRange Version
 orLaterVersion   v = UnionVersionRanges (ThisVersion v) (LaterVersion v)
+
+convertVersionRange :: D.VersionRange -> VersionRange Version
+convertVersionRange =
+    goR
+  where
+    goR D.AnyVersion = AnyVersion
+    goR (D.ThisVersion x) = ThisVersion $ convertVersion x
+    goR (D.LaterVersion x) = LaterVersion $ convertVersion x
+    goR (D.EarlierVersion x) = EarlierVersion $ convertVersion x
+    goR (D.WildcardVersion x) = WildcardVersion $ convertVersion x
+    goR (D.UnionVersionRanges x y) = UnionVersionRanges (goR x) (goR y)
+    goR (D.IntersectVersionRanges x y) = IntersectVersionRanges (goR x) (goR y)
+    goR (D.VersionRangeParens x) = VersionRangeParens $ goR x
+
+convertVersion :: D.Version -> Version
+convertVersion (D.Version x y) = Version (Vector.fromList x) (Vector.fromList $ map pack y)
