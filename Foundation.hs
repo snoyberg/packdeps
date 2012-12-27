@@ -21,6 +21,7 @@ import Text.Hamlet (hamletFile)
 import Data.Text (Text)
 import Data.IORef (IORef)
 import Distribution.PackDeps.Types (Newest, Reverses, LicenseMap)
+import Yesod.Form.Jquery (YesodJquery)
 
 -- | The site argument for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -96,6 +97,8 @@ instance Yesod App where
 
     -- Place Javascript at bottom of the body tag so the rest of the page loads first
     jsLoader _ = BottomOfBody
+
+instance YesodJquery App
 
 -- This instance is required to use forms. You can modify renderMessage to
 -- achieve customized and internationalized form validation messages.

@@ -23,6 +23,7 @@ import Data.List (sortBy, sort)
 import Data.Ord (comparing)
 import Distribution.PackDeps.Types (Version, PackageName (..))
 import Distribution.Text (display)
+import Yesod.Form.Jquery (urlJqueryJs)
 
 getHomeR :: Handler RepHtml
 getHomeR = defaultLayout $ do
@@ -153,9 +154,11 @@ getReverseR :: Text -> Handler RepHtml
 getReverseR dep = do
     (_, reverse') <- getData
     (version, rels) <- maybe notFound return $ H.lookup (PackageName dep) reverse'
+    y <- getYesod
     defaultLayout $ do
         setTitle [shamlet|Reverse dependencies for #{dep}|]
         toWidget $(luciusFile "templates/home.lucius")
+        addScriptEither $ urlJqueryJs y
         $(widgetFile "reverse")
   where
     plural :: Int -> String -> String -> String

@@ -1,0 +1,6 @@
+$(function(){
+    $("#control").show();
+    $("#only-out-of-date").click(function(){
+        $("body").toggleClass("only-out-of-date");
+    });
+});

@@ -1,16 +1,21 @@
 <h1>
     <a href="http://hackage.haskell.org/package/#{dep}">#{dep}
     \ #{show version}
+<div #control>
+    <input #only-out-of-date type=checkbox>
+    <label for=only-out-of-date>Only display out-of-date packages.
 <table>
-    <tr>
-        <th>#{show $ H.size rels} Reverse #{plural (H.size rels) "dep" "deps"}
-        <th>Accepted versions
-    $forall rel <- sortByName $ H.toList rels
+    <thead>
         <tr>
-            $if H.member (fst rel) reverse'
-                <td>
-                    <a href=@{ReverseR $ unPackageName $ fst rel}>#{unPackageName $ fst rel}
-            $else
-                <td>#{unPackageName $ fst rel}
-            <td :not $ withinRange version (snd rel):style="background-color:#fbb">
-                <a href="http://hackage.haskell.org/package/#{unPackageName $ fst rel}">#{show (snd rel)}
+            <th>#{show $ H.size rels} Reverse #{plural (H.size rels) "dep" "deps"}
+            <th>Accepted versions
+    <tbody>
+        $forall rel <- sortByName $ H.toList rels
+            <tr :not $ withinRange version (snd rel):.out-of-date>
+                $if H.member (fst rel) reverse'
+                    <td>
+                        <a href=@{ReverseR $ unPackageName $ fst rel}>#{unPackageName $ fst rel}
+                $else
+                    <td>#{unPackageName $ fst rel}
+                <td .version>
+                    <a href="http://hackage.haskell.org/package/#{unPackageName $ fst rel}">#{show (snd rel)}

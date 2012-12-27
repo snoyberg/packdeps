@@ -1,0 +1,14 @@
+tr.out-of-date td.version {
+    background-color: #fbb;
+}
+.only-out-of-date tbody {
+    tr {
+        display: none;
+    }
+    tr.out-of-date {
+        display: table-row;
+    }
+}
+#control {
+    display: none;
+}
