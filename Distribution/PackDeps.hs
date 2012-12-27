@@ -51,6 +51,7 @@ import Distribution.PackageDescription.Parse
 import qualified Distribution.Version as D
 import Distribution.Text hiding (Text)
 
+import qualified Data.Text as TS
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -161,7 +162,7 @@ getReverses (Newest newest) =
 
 getDescInfo :: GenericPackageDescription -> (DescInfo PackageName Version, License)
 getDescInfo gpd = (DescInfo
-    { diHaystack = toCaseFold $ pack $ author p ++ maintainer p ++ name
+    { diHaystack = toCaseFold $ pack $ unlines [author p, maintainer p, name]
     , diDeps = getDeps gpd
     , diSynopsis = pack $ synopsis p
     }, License $ pack $ display $ license $ packageDescription gpd)
@@ -285,11 +286,15 @@ filterPackages needle =
     mapMaybe go . HMap.toList . unNewest
   where
     go (name, PackInfo { piVersion = v, piDesc = Just' desc }) =
-        if toCaseFold needle `isInfixOf` diHaystack desc &&
+        if matches (diHaystack desc) &&
            not ("(deprecated)" `isInfixOf` diSynopsis desc)
             then Just (name, v, desc)
             else Nothing
     go _ = Nothing
+
+    matches haystack
+        | Just needle' <- TS.stripPrefix "exact:" needle = all (`elem` TS.words haystack) $ TS.words $ toCaseFold needle'
+        | otherwise = toCaseFold needle `isInfixOf` haystack
 
 -- | Find all packages depended upon by the given list of packages.
 deepDeps :: Newest
