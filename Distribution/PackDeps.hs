@@ -40,7 +40,7 @@ import Distribution.PackageDescription.Parse
 import Distribution.Version
 import Distribution.Text
 
-import Data.Char (toLower)
+import Data.Char (toLower, isSpace)
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -61,14 +61,24 @@ loadNewest = do
     c <- getAppUserDataDirectory "cabal"
     cfg <- readFile (c </> "config")
     let repos        = reposFromConfig cfg
-        tarName repo = c </> "packages" </> repo </> "00-index.tar"
+        repoCache    = case lookupInConfig "remote-repo-cache" cfg of
+            []        -> c </> "packages"  -- Default
+            (rrc : _) -> rrc               -- User-specified
+        tarName repo = repoCache </> repo </> "00-index.tar"
     fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom . tarName) $ repos
 
 reposFromConfig :: String -> [String]
-reposFromConfig = map (takeWhile (/= ':'))
-                . catMaybes
-                . map (dropPrefix "remote-repo: ")
-                . lines
+reposFromConfig = map (takeWhile (/= ':')) . lookupInConfig "remote-repo"
+
+-- | Looks up the given key in the cabal configuration file
+lookupInConfig :: String -> String -> [String]
+lookupInConfig key = map trim . catMaybes . map (dropPrefix prefix) . lines
+  where
+    prefix = key ++ ":"
+
+-- | Utility: drop leading and trailing spaces from a string
+trim :: String -> String
+trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
 dropPrefix :: (Eq a) => [a] -> [a] -> Maybe [a]
 dropPrefix prefix s =
