@@ -21,7 +21,7 @@ library
                    , split                     >= 0.1.2.3
                    , bytestring                >= 0.9
                    , text                      >= 0.7
-                   , Cabal                     >= 1.8      && < 1.17
+                   , Cabal                     >= 1.8
                    , time                      >= 1.1.4
                    , containers                >= 0.2
                    , directory                 >= 1.0
