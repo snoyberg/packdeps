@@ -2,4 +2,4 @@ exec: ../dist/build/packdeps/packdeps
 args:
     - production
 host: packdeps.haskellers.com
-copy-to: ubuntu@www.yesodweb.com:/opt/keter/incoming
+copy-to: ubuntu@packdeps.haskellers.com:/opt/keter/incoming
