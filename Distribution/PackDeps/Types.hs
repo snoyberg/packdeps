@@ -97,8 +97,8 @@ instance Binary' Text where
     put' = put . encodeUtf8
     get' = decodeUtf8 <$> get
 instance (Eq k, Hashable k, Binary' k, Binary' v) => Binary' (HashMap k v) where
-    put' = put' . asVector . pack . unpack
-    get' = pack . unpack . asVector <$> get'
+    put' = put' . asVector . pack . mapToList
+    get' = mapFromList . unpack . asVector <$> get'
 instance Binary' (PUVersionRange (VersionRange VersionId)) where
     put' = gput . from
     get' = to <$> gget
@@ -119,7 +119,7 @@ newestToIds :: Newest -> NewestIds
 newestToIds (Newest newest) =
     NewestIds (pack $ namesDL []) (pack $ versionsDL []) (pack $ licensesDL []) (pack pairs)
   where
-    (pairs, _, (namesDL, versionsDL, licensesDL)) = runRWS (mapM goPair $ unpack newest) () (NTI minBound minBound minBound empty empty empty)
+    (pairs, _, (namesDL, versionsDL, licensesDL)) = runRWS (mapM goPair $ mapToList newest) () (NTI minBound minBound minBound mempty mempty mempty)
 
     getName name = do
         nti <- RWS.get
@@ -129,7 +129,7 @@ newestToIds (Newest newest) =
                 let nid = ntiNextNameId nti
                 RWS.put nti
                     { ntiNextNameId = succ nid
-                    , ntiNameMap = insert name nid $ ntiNameMap nti
+                    , ntiNameMap = insertMap name nid $ ntiNameMap nti
                     }
                 tell ((name:), id, id)
                 return nid
@@ -142,7 +142,7 @@ newestToIds (Newest newest) =
                 let vid = ntiNextVersionId nti
                 RWS.put nti
                     { ntiNextVersionId = succ vid
-                    , ntiVersionMap = insert version vid $ ntiVersionMap nti
+                    , ntiVersionMap = insertMap version vid $ ntiVersionMap nti
                     }
                 tell (id, (version:), id)
                 return vid
@@ -155,7 +155,7 @@ newestToIds (Newest newest) =
                 let lid = ntiNextLicenseId nti
                 RWS.put nti
                     { ntiNextLicenseId = succ lid
-                    , ntiLicenseMap = insert license lid $ ntiLicenseMap nti
+                    , ntiLicenseMap = insertMap license lid $ ntiLicenseMap nti
                     }
                 tell (id, id, (license:))
                 return lid
@@ -176,7 +176,7 @@ newestToIds (Newest newest) =
             }
 
     goDI di = do
-        deps <- pack <$> mapM goDep (unpack $ diDeps di)
+        deps <- mapFromList <$> mapM goDep (mapToList $ diDeps di)
         return di { diDeps = deps }
 
     goDep (name, PUVersionRange pu vrange) = (,) <$> getName name <*> (PUVersionRange pu <$> goVR vrange)
@@ -192,7 +192,7 @@ newestToIds (Newest newest) =
 
 newestFromIds :: NewestIds -> Newest
 newestFromIds (NewestIds nameV versionV licenseV pairs) =
-    Newest $ pack $ map goPair $ unpack pairs
+    Newest $ mapFromList $ map goPair $ unpack pairs
   where
     getName (NameId nid) = nameV ! fromIntegral nid
     getVersion (VersionId vid) = versionV ! fromIntegral vid
@@ -206,7 +206,7 @@ newestFromIds (NewestIds nameV versionV licenseV pairs) =
         }
 
     goDI di = di
-        { diDeps = pack $ map goPair' $ unpack $ diDeps di
+        { diDeps = mapFromList $ map goPair' $ mapToList $ diDeps di
         }
 
     goPair' (nid, PUVersionRange pu vr) = (getName nid, PUVersionRange pu $ goVR vr)

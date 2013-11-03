@@ -53,28 +53,28 @@ library
                 NoMonomorphismRestriction
 
     build-depends: base                          >= 4          && < 5
-                 , yesod                         >= 1.1        && < 1.2
-                 , yesod-core                    >= 1.1        && < 1.2
-                 , yesod-static                  >= 1.1        && < 1.2
-                 , yesod-default                 >= 1.1        && < 1.2
-                 , yesod-form                    >= 1.1        && < 1.3
-                 , yesod-newsfeed                >= 1.1        && < 1.2
+                 , yesod                         >= 1.2
+                 , yesod-core                    >= 1.2
+                 , yesod-static                  >= 1.2
+                 , yesod-default                 >= 1.2
+                 , yesod-form                    >= 1.2
+                 , yesod-newsfeed                >= 1.2
                  , clientsession
-                 , bytestring                    >= 0.9        && < 0.10
-                 , text                          >= 0.11       && < 0.12
+                 , bytestring                    >= 0.9
+                 , text                          >= 0.11
                  , template-haskell
-                 , hamlet                        >= 1.1        && < 1.2
-                 , shakespeare-css               >= 1.0        && < 1.1
-                 , shakespeare-js                >= 1.0        && < 1.2
-                 , shakespeare-text              >= 1.0        && < 1.1
-                 , monad-control                 >= 0.3        && < 0.4
-                 , wai-extra                     >= 1.3        && < 1.4
-                 , yaml                          >= 0.8        && < 0.9
-                 , directory                     >= 1.1        && < 1.2
-                 , warp                          >= 1.3        && < 1.4
-                 , packdeps                      >= 0.4        && < 0.5
+                 , hamlet                        >= 1.1
+                 , shakespeare-css               >= 1.0
+                 , shakespeare-js                >= 1.0
+                 , shakespeare-text              >= 1.0
+                 , monad-control                 >= 0.3
+                 , wai-extra                     >= 1.3
+                 , yaml                          >= 0.8
+                 , directory                     >= 1.1
+                 , warp                          >= 1.3
+                 , packdeps                      >= 0.4
                  , http-conduit
-                 , conduit                       >= 0.5        && < 0.6
+                 , conduit                       >= 0.5
                  , time
                  , Cabal
                  , containers
@@ -87,7 +87,7 @@ library
                  , binary
                  , unordered-containers
                  , ghc-prim
-                 , classy-prelude-conduit >= 0.4
+                 , classy-prelude-conduit        >= 0.6
                  , filepath
                  , data-default
                  , lens
@@ -100,5 +100,5 @@ executable         packdeps
     hs-source-dirs:    dist
     build-depends:     base
                      , packdeps-yesod
-                     , yesod-default
+                     , yesod
     ghc-options:   -Wall -threaded -O2

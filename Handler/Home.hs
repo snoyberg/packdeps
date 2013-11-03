@@ -45,19 +45,19 @@ getFeedR = do
   where
     fst3 (x, _, _) = x
 
-getFeed2R :: Text -> Handler RepAtomRss
+getFeed2R :: Text -> Handler TypedContent
 getFeed2R needle = do
     (_, deps) <- getDeps False needle
     feed2Helper needle deps
 
-getFeed2DeepR :: Text -> Handler RepAtomRss
+getFeed2DeepR :: Text -> Handler TypedContent
 getFeed2DeepR needle = do
     (_, deps) <- getDeps True needle
     feed2Helper needle deps
 
 feed2Helper :: Text
             -> [((Text, Version), (HashMap PackageName Version, UTCTime))]
-            -> Handler RepAtomRss
+            -> Handler TypedContent
 feed2Helper needle deps = do
     now <- liftIO getCurrentTime
     newsFeed Feed
@@ -104,7 +104,7 @@ getSpecificR = do
         $(widgetFile "specific")
         atomLink feedR title
 
-getSpecificFeedR :: Text -> Handler RepAtomRss
+getSpecificFeedR :: Text -> Handler TypedContent
 getSpecificFeedR packages' = do
     (newest, _) <- getData
     let descs = mapMaybe (flip getPackage newest . PackageName) $ T.words packages'

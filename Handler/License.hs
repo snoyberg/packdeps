@@ -39,7 +39,7 @@ getLicenses = do
 
 addToggle :: Widget
 addToggle = do
-    x <- lift $ lookupGetParam "include-tests"
+    x <- lookupGetParam "include-tests"
     let includeTests = x == Just "true"
     if includeTests
         then [whamlet|<a href="?include-tests=false">Exclude test and benchmark dependencies|]
