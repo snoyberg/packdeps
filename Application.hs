@@ -25,8 +25,9 @@ import Control.DeepSeq (NFData (rnf), deepseq, ($!!))
 import Data.Version (Version (..))
 import Distribution.Version (VersionRange)
 import Network.HTTP.Conduit
-import Data.Conduit (($$+-))
+import Data.Conduit (($$+-), (=$))
 import Data.Conduit.Binary (sinkFile)
+import Data.Conduit.Zlib (ungzip)
 import System.IO (hPutStrLn, stderr, hFlush)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Binary
@@ -58,14 +59,14 @@ loadData update' = do
     let log s = hPutStrLn stderr s >> hFlush stderr
     log "Entered loadData"
     req' <- parseUrl "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
-    let req = req' { decompress = alwaysDecompress, responseTimeout = Just 30000000 }
+    let req = req' { responseTimeout = Just 30000000 }
     forever $ do
         log "In forever"
         res <- try $ do
             withManager $ \m -> do
                 res <- http req m
                 liftIO $ log "Received response headers"
-                responseBody res $$+- sinkFile "tmp"
+                responseBody res $$+- ungzip =$ sinkFile "tmp"
             log "Finished writing"
             !newest <- fmap (newestFromIds . newestToIds) $ loadNewestFrom "tmp"
             log "Finished parsing"

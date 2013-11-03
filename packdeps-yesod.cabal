@@ -91,6 +91,7 @@ library
                  , filepath
                  , data-default
                  , lens
+                 , zlib-conduit
 
 executable         packdeps
     if flag(library-only)
