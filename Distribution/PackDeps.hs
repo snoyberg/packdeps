@@ -148,7 +148,10 @@ getReverses (Newest newest) =
 
     combine = unionsWith HMap.union
 
-    toTuple rel (dep, PUVersionRange _ range) = HMap.singleton dep $ HMap.singleton rel range
+    toTuple rel (dep, PUVersionRange _ range) =
+        if rel == dep
+            then HMap.empty
+            else HMap.singleton dep $ HMap.singleton rel range
 
     hoisted :: HMap.HashMap PackageName (HMap.HashMap PackageName (VersionRange Version))
     hoisted = combine $ map toTuples $ HMap.toList newest
