@@ -62,7 +62,7 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 
 import Data.Function (on)
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&), second)
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Set as Set
@@ -297,7 +297,12 @@ filterPackages needle =
 
     matches haystack
         | Just needle' <- TS.stripPrefix "exact:" needle = all (`elem` TS.words haystack) $ TS.words $ toCaseFold needle'
-        | otherwise = toCaseFold needle `isInfixOf` haystack
+        | otherwise =
+            let (needle', excludes) = splitExcludes $ toCaseFold needle
+             in (needle' `isInfixOf` haystack) && all (\t -> not $ t `isInfixOf` haystack) excludes
+
+    splitExcludes = second (filter (not . TS.null) . TS.split (== '!'))
+                  . TS.break (== '!')
 
 -- | Find all packages depended upon by the given list of packages.
 deepDeps :: Newest
