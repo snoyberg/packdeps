@@ -31,6 +31,7 @@ import Data.Conduit.Zlib (ungzip)
 import System.IO (hPutStrLn, stderr, hFlush)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Binary
+import Data.Time (getCurrentTime)
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -56,7 +57,10 @@ makeApplication conf = do
 loadData :: ((Newest, Reverses, (LicenseMap, LicenseMap)) -> IO ())
          -> IO ()
 loadData update' = do
-    let log s = hPutStrLn stderr s >> hFlush stderr
+    let log s = do
+            now <- getCurrentTime
+            hPutStrLn stderr $ concat [show now, ": ", s]
+            hFlush stderr
     log "Entered loadData"
     req' <- parseUrl "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
     let req = req' { responseTimeout = Just 30000000 }
