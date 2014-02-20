@@ -1,3 +1,9 @@
 $maybe msg <- mmsg
     <div #message>#{msg}
 ^{widget}
+<footer>
+    $maybe lastUpdate <- mLastUpdate
+        Database last updated:
+        <b>#{show lastUpdate}
+    $nothing
+        Database not yet loaded

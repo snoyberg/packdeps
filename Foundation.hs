@@ -19,9 +19,10 @@ import qualified Settings
 import Settings (widgetFile, Extra (..))
 import Text.Hamlet (hamletFile)
 import Data.Text (Text)
-import Data.IORef (IORef)
+import Data.IORef (IORef, readIORef)
 import Distribution.PackDeps.Types (Newest, Reverses, LicenseMap)
 import Yesod.Form.Jquery (YesodJquery)
+import Data.Time (UTCTime)
 
 -- | The site argument for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
@@ -30,7 +31,7 @@ import Yesod.Form.Jquery (YesodJquery)
 data App = App
     { settings :: AppConfig DefaultEnv Extra
     , getStatic :: Static -- ^ Settings for static file serving.
-    , appData :: IORef (Maybe (Newest, Reverses, (LicenseMap, LicenseMap)))
+    , appData :: IORef (Maybe (Newest, Reverses, (LicenseMap, LicenseMap), UTCTime))
     }
 
 -- Set up i18n messages. See the message folder.
@@ -76,6 +77,12 @@ instance Yesod App where
         -- default-layout-wrapper is the entire page. Since the final
         -- value passed to hamletToRepHtml cannot be a widget, this allows
         -- you to use normal widget features in default-layout.
+
+        mAppData <- liftIO $ readIORef $ appData master
+        let mLastUpdate =
+                case mAppData of
+                    Nothing -> Nothing
+                    Just (_, _, _, x) -> Just x
 
         pc <- widgetToPageContent $ do
             -- $(widgetFile "normalize")

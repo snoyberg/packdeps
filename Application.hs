@@ -31,7 +31,7 @@ import Data.Conduit.Zlib (ungzip)
 import System.IO (hPutStrLn, stderr, hFlush)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Binary
-import Data.Time (getCurrentTime)
+import Data.Time (getCurrentTime, UTCTime (..), Day (..))
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -54,7 +54,7 @@ makeApplication conf = do
     _ <- forkIO $ loadData $ I.writeIORef (appData foundation) . Just
     return app
 
-loadData :: ((Newest, Reverses, (LicenseMap, LicenseMap)) -> IO ())
+loadData :: ((Newest, Reverses, (LicenseMap, LicenseMap), UTCTime) -> IO ())
          -> IO ()
 loadData update' = do
     let log s = do
@@ -79,8 +79,9 @@ loadData update' = do
             !licenses1 <- return $!! getLicenseMap False newest
             !licenses2 <- return $!! getLicenseMap True newest
             log "Finished making license map"
-            update' (newest, reverses, (licenses1, licenses2))
-            _ <- forkIO $ L.writeFile cacheFile $ Data.Binary.encode newest
+            now <- getCurrentTime
+            update' (newest, reverses, (licenses1, licenses2), now)
+            _ <- forkIO $ L.writeFile cacheFile $ Data.Binary.encode (newest, now)
             log "Updated"
             threadDelay $ 1000 * 1000 * 60 * 60
         case res of
@@ -92,19 +93,33 @@ loadData update' = do
 cacheFile :: FilePath
 cacheFile = "/tmp/packdeps-cache.bin"
 
+instance Data.Binary.Binary UTCTime where
+    put (UTCTime (ModifiedJulianDay day) time) = do
+        Data.Binary.put day
+        Data.Binary.put (round time :: Integer)
+    get = do
+        day <- Data.Binary.get
+        time <- Data.Binary.get
+        return $ UTCTime (ModifiedJulianDay day) (fromInteger time)
+
 makeFoundation :: AppConfig DefaultEnv Extra -> IO App
 makeFoundation conf = do
     s <- staticSite
     edata <- try $ do
         lbs <- L.readFile cacheFile
-        !newest <- return $! Data.Binary.decode lbs
-        return $! newest
+        (newest, timestamp) <- return $! Data.Binary.decode lbs
+        newest `seq` timestamp `seq` return (newest, timestamp)
     mdata <-
         case edata of
             Left (e :: SomeException) -> do
                 hPutStrLn stderr $ "Failed initial load: " ++ show e
                 return Nothing
-            Right x -> return $ Just (x, getReverses x, (getLicenseMap False x, getLicenseMap True x))
+            Right (x, timestamp) -> return $ Just
+                ( x
+                , getReverses x
+                , (getLicenseMap False x, getLicenseMap True x)
+                , timestamp
+                )
     idata <- I.newIORef mdata
     return $ App conf s idata
 

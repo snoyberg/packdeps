@@ -32,7 +32,7 @@ getLicenses = do
     mdata <- (appData <$> getYesod) >>= liftIO . readIORef
     x <- lookupGetParam "include-tests"
     let includeTests = x == Just "true"
-    maybe (error "Still loading data, please wait") (\(_, _, (notests, withtests)) -> return $
+    maybe (error "Still loading data, please wait") (\(_, _, (notests, withtests), _) -> return $
         if includeTests
             then (withtests, [("include-tests", "true")])
             else (notests, [])) mdata
