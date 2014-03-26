@@ -143,8 +143,9 @@ getReverses (Newest newest) =
     -- dep = dependency, rel = relying package
     --toTuples :: (PackageName, PackInfo) -> HMap.HashMap PackageName (HMap.HashMap PackageName VersionRange)
     toTuples (_, PackInfo { piDesc = Nothing' }) = HMap.empty
-    toTuples (rel, PackInfo { piDesc = Just' DescInfo { diDeps = deps } }) =
-        combine $ map (toTuple rel) $ HMap.toList deps
+    toTuples (rel, PackInfo { piDesc = Just' desc@DescInfo { diDeps = deps } })
+        | isDeprecated desc = HMap.empty
+        | otherwise = combine $ map (toTuple rel) $ HMap.toList deps
 
     combine = unionsWith HMap.union
 
@@ -283,6 +284,8 @@ parsePackage lbs =
 loadPackage :: FilePath -> IO (Maybe' (DescInfo PackageName Version))
 loadPackage = fmap (fmap fst . parsePackage) . L.readFile
 
+isDeprecated desc = "(deprecated)" `isInfixOf` diSynopsis desc
+
 -- | Find all of the packages matching a given search string.
 filterPackages :: Text -> Newest -> [(PackageName, Version, DescInfo PackageName Version)]
 filterPackages needle =
@@ -290,7 +293,7 @@ filterPackages needle =
   where
     go (name, PackInfo { piVersion = v, piDesc = Just' desc }) =
         if matches (diHaystack desc) &&
-           not ("(deprecated)" `isInfixOf` diSynopsis desc)
+           not (isDeprecated desc)
             then Just (name, v, desc)
             else Nothing
     go _ = Nothing
