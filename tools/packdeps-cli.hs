@@ -1,5 +1,5 @@
 import Distribution.PackDeps
-import Control.Monad (forM_)
+import Control.Monad (forM_, foldM)
 import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess)
 import Distribution.Text (display)
@@ -11,14 +11,16 @@ main = do
     case args of
         [] -> usageExit
         ["help"] -> usageExit
-        _ -> run args
+        _ -> do
+            isGood <- run args
+            if isGood then exitSuccess else exitFailure
 
-run :: [String] -> IO ()
+run :: [String] -> IO Bool
 run args = do
     newest <- loadNewest
-    mapM_ (go newest) args
+    foldM (go newest) True args
   where
-    go newest fp = do
+    go newest wasAllGood fp = do
         mdi <- loadPackage fp
         di <-
             case mdi of
@@ -43,9 +45,7 @@ run args = do
                 forM_ p $ \(x, y) -> putStrLn $ x ++ " " ++ y
                 return False
         putStrLn ""
-        if allGood
-            then exitSuccess
-            else exitFailure
+        return $ wasAllGood && allGood
 
 unPackageName :: PackageName -> String
 unPackageName (PackageName n) = n
