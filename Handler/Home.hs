@@ -12,6 +12,7 @@ import qualified Data.HashMap.Strict as H
 import Distribution.PackDeps
     ( CheckDepsRes (AllNewest, WontAccept)
     , checkDeps, getPackage
+    , Outdated
     )
 import Data.Monoid ((<>))
 import Data.Maybe (mapMaybe)
@@ -56,7 +57,7 @@ getFeed2DeepR needle = do
     feed2Helper needle deps
 
 feed2Helper :: Text
-            -> [((Text, Version), (HashMap PackageName Version, UTCTime))]
+            -> [((Text, Version), (HashMap PackageName Outdated, UTCTime))]
             -> Handler TypedContent
 feed2Helper needle deps = do
     now <- liftIO getCurrentTime

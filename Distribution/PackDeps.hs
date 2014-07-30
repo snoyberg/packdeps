@@ -5,6 +5,8 @@ module Distribution.PackDeps
     ( -- * Data types
       Newest (..)
     , CheckDepsRes (..)
+    , Reason (..)
+    , Outdated (..)
     , DescInfo
       -- * Read package database
     , loadNewest
@@ -248,21 +250,37 @@ checkDeps newest (name, version, desc) =
 -- dependencies. If not, it returns a list of packages which are not accepted,
 -- and a timestamp of the most recently updated package.
 data CheckDepsRes = AllNewest
-                  | WontAccept (HMap.HashMap PackageName Version) UTCTime
+                  | WontAccept (HMap.HashMap PackageName Outdated) UTCTime
+    deriving Show
+
+data Outdated = Outdated Version Reason
+
+instance Show Outdated where
+    show (Outdated _ Deprecated) = "deprecated"
+    show (Outdated version NewerAvailable) = show version
+    show (Outdated version NewerAndDeprecated) = show version ++ " (deprecated)"
+
+data Reason = NewerAvailable | Deprecated | NewerAndDeprecated
     deriving Show
 
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
-notNewest :: Newest -> (PackageName, PUVersionRange (VersionRange Version)) -> Maybe ((PackageName, Version), Tar.EpochTime)
+notNewest :: Newest
+          -> (PackageName, PUVersionRange (VersionRange Version))
+          -> Maybe ((PackageName, Outdated), Tar.EpochTime)
 notNewest (Newest newest) (s, PUVersionRange _ range) =
     case HMap.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
-        Just PackInfo { piVersion = version, piEpoch = e } ->
-            if withinRange version range
-                then Nothing
-                else Just ((s, version), e)
+        Just PackInfo { piVersion = version, piEpoch = e, piDesc = d } ->
+            let mreason =
+                    case (maybe' False isDeprecated d, not $ withinRange version range) of
+                        (False, False) -> Nothing
+                        (True, False) -> Just Deprecated
+                        (False, True) -> Just NewerAvailable
+                        (True, True) -> Just NewerAndDeprecated
+             in flip fmap mreason $ \reason -> ((s, Outdated version reason), e)
 
 -- | Loads up the newest version of a package from the 'Newest' list, if
 -- available.

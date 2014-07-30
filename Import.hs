@@ -29,7 +29,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.Time (UTCTime)
 import Distribution.PackDeps
     ( Newest, Reverses, DescInfo, CheckDepsRes (AllNewest, WontAccept)
-    , filterPackages, deepDeps, checkDeps
+    , filterPackages, deepDeps, checkDeps, Outdated
     )
 import Data.Maybe (mapMaybe)
 import Data.Ord (comparing)
@@ -55,7 +55,7 @@ getDeps :: Bool
         -> Text
         -> Handler
             ( [(PackageName, Version, DescInfo PackageName Version)]
-            , [((Text, Version), (HashMap PackageName Version, UTCTime))]
+            , [((Text, Version), (HashMap PackageName Outdated, UTCTime))]
             )
 getDeps deep needle = do
     (newest, _) <- getData

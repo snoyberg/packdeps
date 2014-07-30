@@ -62,10 +62,7 @@ library
                  , bytestring                    >= 0.9
                  , text                          >= 0.11
                  , template-haskell
-                 , hamlet                        >= 1.1
-                 , shakespeare-css               >= 1.0
-                 , shakespeare-js                >= 1.0
-                 , shakespeare-text              >= 1.0
+                 , shakespeare
                  , monad-control                 >= 0.3
                  , wai-extra                     >= 1.3
                  , yaml                          >= 0.8
@@ -89,7 +86,7 @@ library
                  , filepath
                  , data-default
                  , lens
-                 , zlib-conduit
+                 , conduit-extra
 
 executable         packdeps
     if flag(library-only)
