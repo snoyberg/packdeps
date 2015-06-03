@@ -1,0 +1,8 @@
+flags:
+  packdeps-yesod:
+    library-only: false
+    dev: false
+packages:
+- '.'
+extra-deps: []
+resolver: lts-2.11
