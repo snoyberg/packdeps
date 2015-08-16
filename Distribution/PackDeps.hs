@@ -180,7 +180,9 @@ getDescInfo gpd = DescInfo
 getDeps :: GenericPackageDescription -> [Dependency]
 getDeps x = concat
           $ maybe id ((:) . condTreeConstraints) (condLibrary x)
-          $ map (condTreeConstraints . snd) (condExecutables x)
+          $ (map (condTreeConstraints . snd) (condExecutables x)
+             ++ map (condTreeConstraints . snd) (condTestSuites x)
+             ++ map (condTreeConstraints . snd) (condBenchmarks x))
 
 checkDeps :: Newest -> DescInfo
           -> (PackageName, Version, CheckDepsRes)
