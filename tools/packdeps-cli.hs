@@ -53,7 +53,7 @@ run deep args = do
         allGood <- checkDepsCli newest di
         depsGood <- if deep
                        then do putStrLn $ "\nTransitive dependencies:"
-                               allM (checkDepsCli newest) (deepDeps newest [di])
+                               allM (checkDepsCli newest) (deepLibDeps newest [di])
                        else return True
         putStrLn ""
         return $ wasAllGood && allGood && depsGood
