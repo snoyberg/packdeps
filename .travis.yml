@@ -13,10 +13,10 @@ before_install:
 - chmod a+x ~/.local/bin/stack
 
 install:
-- ./travis_long stack --no-terminal setup
+- stack --no-terminal setup
 
 script:
-- ./travis_long stack --no-terminal build
+- stack --no-terminal build
 
 cache:
   directories:
