@@ -56,7 +56,7 @@ usageExit :: IO a
 usageExit = do
     pname <- getProgName
     putStrLn $ "\n"
-        ++ "Usage: " ++ pname ++ " pkgname.cabal\n\n"
+        ++ "Usage: " ++ pname ++ " pkgname.cabal pkgname2.cabal...\n\n"
         ++ "Check the given cabal file's dependency list to make sure that it does not exclude\n"
         ++ "the newest package available. Its probably worth running the 'cabal update' command\n"
         ++ "immediately before running this program.\n"
