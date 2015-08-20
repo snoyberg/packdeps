@@ -1,0 +1,23 @@
+language: c
+sudo: false
+
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+
+before_install:
+- mkdir -p ~/.local/bin
+- export PATH=~/.local/bin:$PATH
+- travis_retry curl -L https://github.com/commercialhaskell/stack/releases/download/v0.1.3.1/stack-0.1.3.1-x86_64-linux.gz | gunzip > ~/.local/bin/stack
+- chmod a+x ~/.local/bin/stack
+
+install:
+- ./travis_long stack --no-terminal setup
+
+script:
+- ./travis_long stack --no-terminal build
+
+cache:
+  directories:
+  - $HOME/.stack
