@@ -9,6 +9,7 @@ module Distribution.PackDeps
     , parseNewest
       -- * Check a package
     , checkDeps
+    , checkLibDeps
       -- * Get a single package
     , getPackage
     , parsePackage
@@ -16,6 +17,7 @@ module Distribution.PackDeps
       -- * Get multiple packages
     , filterPackages
     , deepDeps
+    , deepLibDeps
       -- * Reverse dependencies
     , Reverses
     , getReverses
@@ -161,6 +163,7 @@ getReverses newest =
 data DescInfo = DescInfo
     { diHaystack :: String
     , diDeps :: [Dependency]
+    , diLibDeps :: [Dependency]
     , diPackage :: PackageIdentifier
     , diSynopsis :: String
     }
@@ -170,6 +173,7 @@ getDescInfo :: GenericPackageDescription -> DescInfo
 getDescInfo gpd = DescInfo
     { diHaystack = map toLower $ author p ++ maintainer p ++ name
     , diDeps = getDeps gpd
+    , diLibDeps = getLibDeps gpd
     , diPackage = pi'
     , diSynopsis = synopsis p
     }
@@ -178,16 +182,27 @@ getDescInfo gpd = DescInfo
     pi'@(PackageIdentifier (PackageName name) _) = package p
 
 getDeps :: GenericPackageDescription -> [Dependency]
-getDeps x = concat
-          $ maybe id ((:) . condTreeConstraints) (condLibrary x)
-          $ (map (condTreeConstraints . snd) (condExecutables x)
-             ++ map (condTreeConstraints . snd) (condTestSuites x)
-             ++ map (condTreeConstraints . snd) (condBenchmarks x))
+getDeps x = getLibDeps x ++ concat
+    [ concatMap (condTreeConstraints . snd) (condExecutables x)
+    , concatMap (condTreeConstraints . snd) (condTestSuites x)
+    , concatMap (condTreeConstraints . snd) (condBenchmarks x)
+    ]
+
+getLibDeps :: GenericPackageDescription -> [Dependency]
+getLibDeps gpd = maybe [] condTreeConstraints (condLibrary gpd)
 
 checkDeps :: Newest -> DescInfo
           -> (PackageName, Version, CheckDepsRes)
-checkDeps newest desc =
-    case mapMaybe (notNewest newest) $ diDeps desc of
+checkDeps = checkDepsImpl diDeps
+
+checkLibDeps :: Newest -> DescInfo
+             -> (PackageName, Version, CheckDepsRes)
+checkLibDeps = checkDepsImpl diLibDeps
+
+checkDepsImpl :: (DescInfo -> [Dependency]) -> Newest -> DescInfo
+              -> (PackageName, Version, CheckDepsRes)
+checkDepsImpl deps newest desc =
+    case mapMaybe (notNewest newest) $ deps desc of
         [] -> (name, version, AllNewest)
         x -> let y = map head $ group $ sort $ map fst x
                  et = maximum $ map snd x
@@ -247,7 +262,14 @@ filterPackages needle =
 
 -- | Find all packages depended upon by the given list of packages.
 deepDeps :: Newest -> [DescInfo] -> [DescInfo]
-deepDeps newest dis0 =
+deepDeps = deepDepsImpl diDeps
+
+-- | Find all packages depended upon by the given list of packages.
+deepLibDeps :: Newest -> [DescInfo] -> [DescInfo]
+deepLibDeps = deepDepsImpl diLibDeps
+
+deepDepsImpl :: (DescInfo -> [Dependency]) -> Newest -> [DescInfo] -> [DescInfo]
+deepDepsImpl deps newest dis0 =
     go Set.empty dis0
   where
     go _ [] = []
@@ -257,7 +279,7 @@ deepDeps newest dis0 =
       where
         PackageIdentifier (PackageName name) _ = diPackage di
         viewed' = Set.insert name viewed
-        newDis = mapMaybe getDI $ diDeps di
+        newDis = mapMaybe getDI $ deps di
         getDI :: Dependency -> Maybe DescInfo
         getDI (Dependency (PackageName name') _) = do
             pi' <- Map.lookup name' newest
