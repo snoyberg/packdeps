@@ -9,6 +9,7 @@ module Distribution.PackDeps
     , parseNewest
       -- * Check a package
     , checkDeps
+    , checkLibDeps
       -- * Get a single package
     , getPackage
     , parsePackage
@@ -192,8 +193,16 @@ getLibDeps gpd = maybe [] condTreeConstraints (condLibrary gpd)
 
 checkDeps :: Newest -> DescInfo
           -> (PackageName, Version, CheckDepsRes)
-checkDeps newest desc =
-    case mapMaybe (notNewest newest) $ diDeps desc of
+checkDeps = checkDepsImpl diDeps
+
+checkLibDeps :: Newest -> DescInfo
+             -> (PackageName, Version, CheckDepsRes)
+checkLibDeps = checkDepsImpl diLibDeps
+
+checkDepsImpl :: (DescInfo -> [Dependency]) -> Newest -> DescInfo
+              -> (PackageName, Version, CheckDepsRes)
+checkDepsImpl deps newest desc =
+    case mapMaybe (notNewest newest) $ deps desc of
         [] -> (name, version, AllNewest)
         x -> let y = map head $ group $ sort $ map fst x
                  et = maximum $ map snd x

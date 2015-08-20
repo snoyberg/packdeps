@@ -4,6 +4,7 @@ import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess)
 import Distribution.Text (display)
 import Distribution.Package (PackageName (PackageName))
+import Distribution.Version (Version)
 import Control.Monad (liftM)
 
 main :: IO ()
@@ -17,9 +18,11 @@ main = do
             isGood <- run ("--recursive" `elem` args) (filter (/= "--recursive") args)
             if isGood then exitSuccess else exitFailure
 
-checkDepsCli :: Newest -> DescInfo -> IO Bool
-checkDepsCli newest di =
-    case checkDeps newest di of
+type CheckDeps = Newest -> DescInfo -> (PackageName, Version, CheckDepsRes)
+
+checkDepsCli :: CheckDeps -> Newest -> DescInfo -> IO Bool
+checkDepsCli cd newest di =
+    case cd newest di of
         (pn, v, AllNewest) -> do
             putStrLn $ concat
                 [ unPackageName pn
@@ -50,10 +53,10 @@ run deep args = do
         di <- case mdi of
              Just di -> return di
              Nothing -> error $ "Could not parse cabal file: " ++ fp
-        allGood <- checkDepsCli newest di
+        allGood <- checkDepsCli checkDeps newest di
         depsGood <- if deep
                        then do putStrLn $ "\nTransitive dependencies:"
-                               allM (checkDepsCli newest) (deepLibDeps newest [di])
+                               allM (checkDepsCli checkLibDeps newest) (deepLibDeps newest [di])
                        else return True
         putStrLn ""
         return $ wasAllGood && allGood && depsGood
