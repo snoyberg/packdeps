@@ -11,6 +11,7 @@ main = do
     case args of
         [] -> usageExit
         ["help"] -> usageExit
+        _ | "-h" `elem` args || "--help" `elem` args -> usageExit
         _ -> do
             isGood <- run args
             if isGood then exitSuccess else exitFailure
