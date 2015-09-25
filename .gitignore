@@ -4,3 +4,4 @@ newest
 /dist/
 static/tmp/
 yesod-devel/
+/.stack-work/

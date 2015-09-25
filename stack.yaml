@@ -1,8 +1,8 @@
-flags:
-  packdeps-yesod:
-    library-only: false
-    dev: false
-packages:
-- '.'
-extra-deps: []
-resolver: lts-2.11
+resolver: lts-3.6
+image:
+  container:
+    name: snoyberg/packdeps
+    base: fpco/stack-run
+    add:
+      config: /app/config
+      static: /app/static
