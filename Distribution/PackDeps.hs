@@ -101,7 +101,7 @@ addPackage m entry =
                     case Map.lookup package' m of
                         Nothing -> go package' version
                         Just PackInfo { piVersion = oldv } ->
-                            -- in 01-index.tar there are entries with some version
+                            -- in 01-index.tar there are entries with the same versions
                             if version >= oldv
                                 then go package' version
                                 else m
@@ -129,18 +129,13 @@ data PackInfo = PackInfo
 piRevision :: PackInfo -> Int
 piRevision = fromMaybe 0 . fmap diRevision . piDesc
 
+-- We should compare revisions as well,
+-- but we don't do that, as it would force `piDesc` and make `packdeps`
+-- executable increadibly slow (parse all cabal files on Hackage)
+-- Instead we rely on the fact that newer revisions are always later in
+-- 01-index.tar
 maxVersion :: PackInfo -> PackInfo -> PackInfo
-maxVersion pi1 pi2 = case cmp pi1 pi2 of
-    LT -> pi2
-    EQ -> pi2
-    GT -> pi1
-  where
-    -- compare first on version, then on revision
-    -- But we don't do this, as it would force `piDesc`, and makes `packdeps`
-    -- increadibly slow
-    -- Instead we rely on the fact that newer revision are always later in
-    -- 01-index.tar
-    cmp = (compare `on` piVersion) -- <> (compare `on` piRevision)
+maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
 
 -- | The newest version of every package.
 type Newest = Map.Map String PackInfo
