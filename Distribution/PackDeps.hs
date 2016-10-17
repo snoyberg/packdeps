@@ -25,15 +25,16 @@ module Distribution.PackDeps
     , diName
       -- * Internal
     , PackInfo (..)
+    , piRevision
     , DescInfo (..)
     ) where
 
-import System.Directory (getAppUserDataDirectory)
+import System.Directory (getAppUserDataDirectory, doesFileExist)
 import System.FilePath ((</>))
 import qualified Data.Map as Map
-import Data.List (foldl', group, sort, isInfixOf, isPrefixOf)
+import Data.List (foldl', group, sort, isInfixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
-import Data.Maybe (mapMaybe, catMaybes)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Control.Exception (throw)
 
 import Distribution.Package
@@ -41,8 +42,9 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Version
 import Distribution.Text
+import qualified Distribution.ParseUtils as PU
 
-import Data.Char (toLower, isSpace)
+import Data.Char (toLower)
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as T
 import qualified Data.Text.Encoding.Error as T
@@ -57,39 +59,30 @@ import Control.Arrow ((&&&))
 import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Set as Set
+import Text.Read (readMaybe)
+-- import Data.Monoid ((<>))
 
 loadNewest :: IO Newest
 loadNewest = do
     c <- getAppUserDataDirectory "cabal"
-    cfg <- readFile (c </> "config")
+    cfg' <- readFile (c </> "config")
+    cfg <- parseResult (fail . show) return $ PU.readFields cfg'
     let repos        = reposFromConfig cfg
         repoCache    = case lookupInConfig "remote-repo-cache" cfg of
             []        -> c </> "packages"  -- Default
             (rrc : _) -> rrc               -- User-specified
-        tarName repo = repoCache </> repo </> "00-index.tar"
-    fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom . tarName) $ repos
+        tarNames repo = [ pfx </> "01-index.tar", pfx </> "00-index.tar" ]
+          where pfx = repoCache </> repo
+    fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom . tarNames) $ repos
 
-reposFromConfig :: String -> [String]
-reposFromConfig = map (takeWhile (/= ':')) . lookupInConfig "remote-repo"
-
--- | Looks up the given key in the cabal configuration file
-lookupInConfig :: String -> String -> [String]
-lookupInConfig key = map trim . catMaybes . map (dropPrefix prefix) . lines
-  where
-    prefix = key ++ ":"
-
--- | Utility: drop leading and trailing spaces from a string
-trim :: String -> String
-trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
-
-dropPrefix :: (Eq a) => [a] -> [a] -> Maybe [a]
-dropPrefix prefix s =
-  if prefix `isPrefixOf` s
-  then Just . drop (length prefix) $ s
-  else Nothing
-
-loadNewestFrom :: FilePath -> IO Newest
-loadNewestFrom = fmap parseNewest . L.readFile
+-- | Takes a list of possible pathes, tries them in order until one exists.
+loadNewestFrom :: [FilePath] -> IO Newest
+loadNewestFrom []         = fail "loadNewestFrom: no index tarball"
+loadNewestFrom (fp : fps) = do
+    e <- doesFileExist fp
+    if e
+        then fmap parseNewest (L.readFile fp)
+        else loadNewestFrom fps
 
 parseNewest :: L.ByteString -> Newest
 parseNewest = foldl' addPackage Map.empty . entriesToList . Tar.read
@@ -108,7 +101,8 @@ addPackage m entry =
                     case Map.lookup package' m of
                         Nothing -> go package' version
                         Just PackInfo { piVersion = oldv } ->
-                            if version > oldv
+                            -- in 01-index.tar there are entries with some version
+                            if version >= oldv
                                 then go package' version
                                 else m
                 Nothing -> m
@@ -117,7 +111,7 @@ addPackage m entry =
     go package' version =
         case Tar.entryContent entry of
             Tar.NormalFile bs _ ->
-                 Map.insert package' PackInfo
+                Map.insertWith maxVersion package' PackInfo
                         { piVersion = version
                         , piDesc = parsePackage bs
                         , piEpoch = Tar.entryTime entry
@@ -125,14 +119,28 @@ addPackage m entry =
             _ -> m
 
 data PackInfo = PackInfo
-    { piVersion :: Version
-    , piDesc :: Maybe DescInfo
-    , piEpoch :: Tar.EpochTime
+    { piVersion  :: Version
+    , piDesc     :: Maybe DescInfo
+    , piEpoch    :: Tar.EpochTime
     }
     deriving (Show, Read)
 
+-- Extract revision from PackInfo, default to 0
+piRevision :: PackInfo -> Int
+piRevision = fromMaybe 0 . fmap diRevision . piDesc
+
 maxVersion :: PackInfo -> PackInfo -> PackInfo
-maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
+maxVersion pi1 pi2 = case cmp pi1 pi2 of
+    LT -> pi2
+    EQ -> pi2
+    GT -> pi1
+  where
+    -- compare first on version, then on revision
+    -- But we don't do this, as it would force `piDesc`, and makes `packdeps`
+    -- increadibly slow
+    -- Instead we rely on the fact that newer revision are always later in
+    -- 01-index.tar
+    cmp = (compare `on` piVersion) -- <> (compare `on` piRevision)
 
 -- | The newest version of every package.
 type Newest = Map.Map String PackInfo
@@ -162,24 +170,30 @@ getReverses newest =
 -- | Information on a single package.
 data DescInfo = DescInfo
     { diHaystack :: String
-    , diDeps :: [Dependency]
-    , diLibDeps :: [Dependency]
-    , diPackage :: PackageIdentifier
+    , diDeps     :: [Dependency]
+    , diLibDeps  :: [Dependency]
+    , diPackage  :: PackageIdentifier
+    , diRevision :: Int
     , diSynopsis :: String
     }
     deriving (Show, Read)
 
+-- | Return revision and DescInfo
 getDescInfo :: GenericPackageDescription -> DescInfo
 getDescInfo gpd = DescInfo
     { diHaystack = map toLower $ author p ++ maintainer p ++ name
-    , diDeps = getDeps gpd
-    , diLibDeps = getLibDeps gpd
-    , diPackage = pi'
+    , diDeps     = getDeps gpd
+    , diLibDeps  = getLibDeps gpd
+    , diPackage  = pi'
+    , diRevision = rev
     , diSynopsis = synopsis p
     }
   where
     p = packageDescription gpd
     pi'@(PackageIdentifier (PackageName name) _) = package p
+    rev = fromMaybe 0 $ do
+        r <- lookup "x-revision" (customFieldsPD p)
+        readMaybe r
 
 getDeps :: GenericPackageDescription -> [Dependency]
 getDeps x = getLibDeps x ++ concat
@@ -290,3 +304,32 @@ diName =
     unPN . pkgName . diPackage
   where
     unPN (PackageName pn) = pn
+
+-------------------------------------------------------------------------------
+-- ~/.cabal/config parsing
+-------------------------------------------------------------------------------
+
+reposFromConfig :: [PU.Field] -> [String]
+reposFromConfig fields = takeWhile (/= ':') <$> mapMaybe f fields
+  where
+    f (PU.F _lineNo name value)
+        | name == "remote-repo"
+        = Just value
+    f (PU.Section _lineNo secName arg _fields)
+        | secName == "repository"
+        = Just arg
+    f _ = Nothing
+
+-- | Looks up the given key in the cabal configuration file
+lookupInConfig :: String -> [PU.Field] -> [String]
+lookupInConfig key = mapMaybe f
+  where
+    f (PU.F _lineNo name value)
+        | name == key
+        = Just value
+    f _ = Nothing
+
+-- | Like 'either', but for 'ParseResult'
+parseResult :: (PU.PError -> r) -> (a -> r) -> ParseResult a -> r
+parseResult l _ (PU.ParseFailed e)    = l e
+parseResult _ r (PU.ParseOk _warns x) = r x

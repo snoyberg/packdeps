@@ -17,7 +17,7 @@ homepage:        http://packdeps.haskellers.com/
 extra-source-files: README.md ChangeLog.md
 
 library
-    build-depends:   base                      >= 4        && < 5
+    build-depends:   base                      >= 4.6      && < 5
                    , tar                       >= 0.4      && < 0.6
                    , split                     >= 0.1.2.3
                    , bytestring                >= 0.9
