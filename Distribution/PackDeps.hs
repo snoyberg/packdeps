@@ -29,6 +29,7 @@ module Distribution.PackDeps
     , DescInfo (..)
     ) where
 
+import Control.Applicative as A ((<$>))
 import System.Directory (getAppUserDataDirectory, doesFileExist)
 import System.FilePath ((</>))
 import qualified Data.Map as Map
@@ -305,7 +306,7 @@ diName =
 -------------------------------------------------------------------------------
 
 reposFromConfig :: [PU.Field] -> [String]
-reposFromConfig fields = takeWhile (/= ':') <$> mapMaybe f fields
+reposFromConfig fields = takeWhile (/= ':') A.<$> mapMaybe f fields
   where
     f (PU.F _lineNo name value)
         | name == "remote-repo"
