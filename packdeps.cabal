@@ -17,12 +17,12 @@ homepage:        http://packdeps.haskellers.com/
 extra-source-files: README.md ChangeLog.md
 
 library
-    build-depends:   base                      >= 4        && < 5
+    build-depends:   base                      >= 4.6      && < 5
                    , tar                       >= 0.4      && < 0.6
                    , split                     >= 0.1.2.3
                    , bytestring                >= 0.9
                    , text                      >= 0.7
-                   , Cabal                     >= 1.8
+                   , Cabal                     >= 1.14     && <1.25
                    , time                      >= 1.1.4
                    , containers                >= 0.2
                    , directory                 >= 1.0
