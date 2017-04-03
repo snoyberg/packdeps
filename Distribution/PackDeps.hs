@@ -36,10 +36,12 @@ import qualified Data.HashMap.Strict as HMap
 import System.Directory (getAppUserDataDirectory)
 import System.FilePath ((</>))
 import qualified Data.Map as Map
-import Data.List (foldl', isPrefixOf)
+import Data.Foldable (foldl', foldlM)
+import Data.List (isPrefixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
 import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
 import Control.Exception (throw)
+import Control.Monad ((<=<), when)
 
 import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
@@ -94,37 +96,42 @@ dropPrefix prefix s =
   else Nothing
 
 loadNewestFrom :: FilePath -> IO Newest
-loadNewestFrom = fmap parseNewest . L.readFile
+loadNewestFrom = parseNewest <=< L.readFile
 
-parseNewest :: L.ByteString -> Newest
-parseNewest = foldl' addPackage (Newest HMap.empty) . entriesToList . Tar.read
+parseNewest :: L.ByteString -> IO Newest
+parseNewest = fmap fst . foldlM addPackage (Newest HMap.empty, 0) . entriesToList . Tar.read
 
 entriesToList :: Tar.Entries Tar.FormatError -> [Tar.Entry]
 entriesToList Tar.Done = []
 entriesToList (Tar.Fail s) = throw s
 entriesToList (Tar.Next e es) = e : entriesToList es
 
-addPackage :: Newest -> Tar.Entry -> Newest
-addPackage (Newest m) entry = Newest $
-    case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
+addPackage :: (Newest, Int) -> Tar.Entry -> IO (Newest, Int)
+addPackage (Newest m, count) entry = do
+    when (count' > 0 && count' `mod` 100 == 0) $ putStrLn $ "Processed cabal file count: " ++ show count'
+    return (Newest m', count')
+  where
+    (m', count') =
+      case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
         [package', versionS, _] ->
             let package'' = PackageName $ pack package'
              in case fmap convertVersion $ simpleParse versionS of
+                    _ | package' == "acme-everything" -> (m, count) -- takes too long to parse
                     Just version ->
                         case HMap.lookup package'' m of
                             Nothing -> go package'' version
                             Just PackInfo { piVersion = oldv } ->
                                 if version > oldv
                                     then go package'' version
-                                    else m
-                    Nothing -> m
-        _ -> m
-  where
+                                    else (m, count)
+                    Nothing -> (m, count)
+        _ -> (m, count)
+
     go package' version =
         case Tar.entryContent entry of
             Tar.NormalFile bs _ ->
                  let p = parsePackage bs
-                  in HMap.insert package' PackInfo
+                  in (HMap.insert package' PackInfo
                         { piVersion = version
                         , piDesc = fmap fst p
                         , piEpoch = Tar.entryTime entry
@@ -132,8 +139,8 @@ addPackage (Newest m) entry = Newest $
                             case p of
                                 Nothing' -> License "Unknown"
                                 Just' (_, l) -> l
-                        } m
-            _ -> m
+                        } m, count + 1)
+            _ -> (m, count)
 
 maxVersion :: Ord v => PackInfo n v l -> PackInfo n v l -> PackInfo n v l
 maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
@@ -188,6 +195,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
                 ]
   where
     flagMaps =
+        take 10 $ -- arbitrary hack to make this thing complete in reasonable time/memory
         loop $ genPackageFlags gpd
       where
         loop [] = return Map.empty
