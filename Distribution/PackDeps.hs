@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PatternGuards #-}
 module Distribution.PackDeps
     ( -- * Data types
       Newest (..)
@@ -28,23 +29,20 @@ module Distribution.PackDeps
     , getLicenseMap
     ) where
 
-import Prelude
+import Prelude hiding (pi)
 import Data.Text (Text, isInfixOf, toCaseFold, pack)
 import qualified Data.HashMap.Strict as HMap
-import qualified Data.Vector as Vector
 
 import System.Directory (getAppUserDataDirectory)
 import System.FilePath ((</>))
 import qualified Data.Map as Map
-import Data.List (foldl', group, sort, isPrefixOf)
+import Data.List (foldl', isPrefixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
 import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
 import Control.Exception (throw)
-import Control.Monad (join)
 
 import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
-import Data.Monoid (mempty, mconcat, mappend)
 
 import Distribution.Package hiding (PackageName)
 import qualified Distribution.Package as D
@@ -63,13 +61,11 @@ import Data.List.Split (splitOn)
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 
-import Data.Function (on)
-import Control.Arrow ((&&&), second)
-import Data.List (groupBy, sortBy)
-import Data.Ord (comparing)
+import Control.Arrow (second)
 import qualified Data.Set as Set
-import Control.Monad.Trans.State (State, evalState, get, put)
+import Control.Monad.Trans.State (State, evalState, get)
 import Control.Lens
+import Data.Hashable (Hashable)
 
 loadNewest :: IO Newest
 loadNewest = do
@@ -79,6 +75,10 @@ loadNewest = do
         tarName repo = c </> "packages" </> repo </> "00-index.tar"
     fmap (Newest . unionsWith maxVersion . map unNewest) $ mapM (loadNewestFrom . tarName) repos
 
+unionsWith :: (Foldable f, Hashable k, Eq k)
+           => (v -> v -> v)
+           -> f (HMap.HashMap k v)
+           -> HMap.HashMap k v
 unionsWith f = foldl' (HMap.unionWith f) HMap.empty
 
 reposFromConfig :: String -> [String]
@@ -174,7 +174,7 @@ getDescInfo gpd = (DescInfo
     }, License $ pack $ display $ license $ packageDescription gpd)
   where
     p = packageDescription gpd
-    pi'@(PackageIdentifier (D.PackageName name) version) = package p
+    PackageIdentifier (D.PackageName name) _version = package p
 
 getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange (VersionRange Version))
 getDeps gpd = HMap.map (fmap convertVersionRange)
@@ -230,7 +230,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
     checkCond' _ (Var (OS _)) = True
     checkCond' _ (Var (Arch _)) = True
     checkCond' flagMap (Var (Flag f)) = fromMaybe False $ Map.lookup f flagMap
-    checkCond' _ (Var (Impl compiler range)) = True
+    checkCond' _ (Var (Impl _compiler _range)) = True
     checkCond' _ (Lit b) = b
     checkCond' flagMap (CNot c) = not $ checkCond' flagMap c
     checkCond' flagMap (COr c1 c2) = checkCond' flagMap c1 || checkCond' flagMap c2
@@ -302,6 +302,7 @@ parsePackage lbs =
 loadPackage :: FilePath -> IO (Maybe' (DescInfo PackageName Version))
 loadPackage = fmap (fmap fst . parsePackage) . L.readFile
 
+isDeprecated :: DescInfo name version -> Bool
 isDeprecated desc = "(deprecated)" `isInfixOf` diSynopsis desc
 
 -- | Find all of the packages matching a given search string.
@@ -339,10 +340,10 @@ deepDeps (Newest newest) dis0 =
       where
         viewed' = Set.insert name viewed
         newDis = mapMaybe getDI $ HMap.keys $ diDeps di
-        getDI name = do
-            pi <- HMap.lookup name newest
-            di <- m'ToM $ piDesc pi
-            return (name, piVersion pi, di)
+        getDI name' = do
+            pi <- HMap.lookup name' newest
+            di' <- m'ToM $ piDesc pi
+            return (name', piVersion pi, di')
 
 data LMS = LMS
     { _lmsProcessed :: Set.Set PackageName

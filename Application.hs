@@ -16,15 +16,12 @@ import qualified Data.IORef as I
 
 import Control.Exception (SomeException, try)
 import Control.Concurrent (forkIO, threadDelay)
-import qualified Data.ByteString as S
-import qualified Data.ByteString.Char8 as S8
-import Distribution.PackDeps (Newest, Reverses, loadNewestFrom, getReverses, DescInfo, getLicenseMap)
+import Distribution.PackDeps (loadNewestFrom, getReverses, getLicenseMap)
 import Distribution.PackDeps.Types
 import Control.Monad (forever)
-import Control.DeepSeq (NFData (rnf), deepseq, ($!!))
-import Data.Version (Version (..))
-import Distribution.Version (VersionRange)
+import Control.DeepSeq (($!!))
 import Network.HTTP.Conduit
+import Network.HTTP.Client.TLS (getGlobalManager)
 import Data.Conduit (($$+-), (=$))
 import Data.Conduit.Binary (sinkFile)
 import Data.Conduit.Zlib (ungzip)
@@ -32,6 +29,7 @@ import System.IO (hPutStrLn, stderr, hFlush)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Binary
 import Data.Time (getCurrentTime, UTCTime (..), Day (..))
+import ClassyPrelude.Conduit (runResourceT)
 
 -- Import all relevant handler modules here.
 -- Don't forget to add new modules to your cabal file!
@@ -62,12 +60,13 @@ loadData update' = do
             hPutStrLn stderr $ concat [show now, ": ", s]
             hFlush stderr
     log "Entered loadData"
-    req' <- parseUrl "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
+    req' <- parseUrlThrow "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
     let req = req' { responseTimeout = Just 30000000 }
     forever $ do
         log "In forever"
         res <- try $ do
-            withManager $ \m -> do
+            m <- getGlobalManager
+            runResourceT $ do
                 res <- http req m
                 liftIO $ log "Received response headers"
                 responseBody res $$+- ungzip =$ sinkFile "tmp"

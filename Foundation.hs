@@ -88,7 +88,7 @@ instance Yesod App where
             -- $(widgetFile "normalize")
             -- addStylesheet $ StaticR css_bootstrap_css
             $(widgetFile "default-layout")
-        hamletToRepHtml $(hamletFile "templates/default-layout-wrapper.hamlet")
+        withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows

@@ -1,12 +1,9 @@
 module Handler.Home where
 
 import Import
-import Distribution.Package hiding (PackageName (..))
 import Yesod.Feed
 import Yesod.AtomFeed
-import Text.Hamlet (shamlet)
 import Text.Lucius (luciusFile)
-import qualified Data.Map as Map
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as H
 import Distribution.PackDeps
@@ -20,18 +17,17 @@ import qualified Data.Text as T
 import Data.Time (getCurrentTime, UTCTime)
 import Distribution.PackDeps.Util (withinRange)
 import Control.Arrow ((&&&))
-import Data.List (sortBy, sort)
+import Data.List (sortBy)
 import Data.Ord (comparing)
 import Distribution.PackDeps.Types (Version, PackageName (..))
-import Distribution.Text (display)
 import Yesod.Form.Jquery (urlJqueryJs)
 
-getHomeR :: Handler RepHtml
+getHomeR :: Handler Html
 getHomeR = defaultLayout $ do
     setTitle "Hackage dependency monitor"
     $(widgetFile "home")
 
-getFeedR :: Handler RepHtml
+getFeedR :: Handler Html
 getFeedR = do
     needle <- runInputGet $ ireq textField "needle"
     deep <- isDeep
@@ -70,6 +66,7 @@ feed2Helper needle deps = do
         , feedEntries = map go' deps
         , feedLanguage = "en"
         , feedDescription = toHtml $ "Newer dependencies for " <> needle
+        , feedLogo = Nothing
         }
   where
     go' ((name, version), (deps', time)) = FeedEntry
@@ -83,13 +80,14 @@ feed2Helper needle deps = do
             <th>#{unPackageName $ fst d}
             <td>#{show $ snd d}
 |]
+        , feedEntryEnclosure = Nothing
         }
 
 getFeed3R :: Text -> Text -> Text -> Text -> Handler ()
 getFeed3R _ package _ _ =
     redirect $ "http://hackage.haskell.org/package/" <> package
 
-getSpecificR :: Handler RepHtml
+getSpecificR :: Handler Html
 getSpecificR = do
     packages' <- lookupGetParams "package"
     (newest, _) <- getData
@@ -123,6 +121,7 @@ getSpecificFeedR packages' = do
         , feedEntries = map go' deps
         , feedLanguage = "en"
         , feedDescription = "Newer dependencies for Hackage packages"
+        , feedLogo = Nothing
         }
   where
     go' ((name, version), (deps, time)) = FeedEntry
@@ -136,9 +135,10 @@ getSpecificFeedR packages' = do
             <th>#{unPackageName $ fst d}
             <td>#{show $ snd d}
 |]
+        , feedEntryEnclosure = Nothing
         }
 
-getReverseListR :: Handler RepHtml
+getReverseListR :: Handler Html
 getReverseListR = do
     (_, reverse') <- getData
     defaultLayout $ do
@@ -151,7 +151,7 @@ getReverseListR = do
             [] -> Nothing
             ps -> Just $ show $ length ps
 
-getReverseR :: Text -> Handler RepHtml
+getReverseR :: Text -> Handler Html
 getReverseR dep = do
     (_, reverse') <- getData
     (version, rels) <- maybe notFound return $ H.lookup (PackageName dep) reverse'

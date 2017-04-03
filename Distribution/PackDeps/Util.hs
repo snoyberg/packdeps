@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module Distribution.PackDeps.Util where
 
 import ClassyPrelude.Conduit
@@ -22,16 +23,16 @@ foldVersionRange :: a                         -- ^ @\"-any\"@ version
                  -> (a -> a -> a)             -- ^ @\"_ || _\"@ union
                  -> (a -> a -> a)             -- ^ @\"_ && _\"@ intersection
                  -> VersionRange Version -> a
-foldVersionRange anyv this later earlier union intersect = fold
+foldVersionRange anyv this later earlier union' intersect' = fold'
   where
-    fold AnyVersion                     = anyv
-    fold (ThisVersion v)                = this v
-    fold (LaterVersion v)               = later v
-    fold (EarlierVersion v)             = earlier v
-    fold (WildcardVersion v)            = fold (wildcard v)
-    fold (UnionVersionRanges v1 v2)     = union (fold v1) (fold v2)
-    fold (IntersectVersionRanges v1 v2) = intersect (fold v1) (fold v2)
-    fold (VersionRangeParens v)         = fold v
+    fold' AnyVersion                     = anyv
+    fold' (ThisVersion v)                = this v
+    fold' (LaterVersion v)               = later v
+    fold' (EarlierVersion v)             = earlier v
+    fold' (WildcardVersion v)            = fold' (wildcard v)
+    fold' (UnionVersionRanges v1 v2)     = union' (fold' v1) (fold' v2)
+    fold' (IntersectVersionRanges v1 v2) = intersect' (fold' v1) (fold' v2)
+    fold' (VersionRangeParens v)         = fold' v
 
     wildcard v = IntersectVersionRanges
                    (orLaterVersion v)
@@ -54,26 +55,26 @@ foldVersionRange' :: a                         -- ^ @\"-any\"@ version
                   -> (a -> a)                  -- ^ @\"(_)\"@ parentheses
                   -> VersionRange Version -> a
 foldVersionRange' anyv this later earlier orLater orEarlier
-                  wildcard union intersect parens = fold
+                  wildcard union' intersect' parens = fold'
   where
-    fold AnyVersion                     = anyv
-    fold (ThisVersion v)                = this v
-    fold (LaterVersion v)               = later v
-    fold (EarlierVersion v)             = earlier v
+    fold' AnyVersion                     = anyv
+    fold' (ThisVersion v)                = this v
+    fold' (LaterVersion v)               = later v
+    fold' (EarlierVersion v)             = earlier v
 
-    fold (UnionVersionRanges (ThisVersion    v)
+    fold' (UnionVersionRanges (ThisVersion    v)
                              (LaterVersion   v')) | v==v' = orLater v
-    fold (UnionVersionRanges (LaterVersion   v)
+    fold' (UnionVersionRanges (LaterVersion   v)
                              (ThisVersion    v')) | v==v' = orLater v
-    fold (UnionVersionRanges (ThisVersion    v)
+    fold' (UnionVersionRanges (ThisVersion    v)
                              (EarlierVersion v')) | v==v' = orEarlier v
-    fold (UnionVersionRanges (EarlierVersion v)
+    fold' (UnionVersionRanges (EarlierVersion v)
                              (ThisVersion    v')) | v==v' = orEarlier v
 
-    fold (WildcardVersion v)            = wildcard v (wildcardUpperBound v)
-    fold (UnionVersionRanges v1 v2)     = union (fold v1) (fold v2)
-    fold (IntersectVersionRanges v1 v2) = intersect (fold v1) (fold v2)
-    fold (VersionRangeParens v)         = parens (fold v)
+    fold' (WildcardVersion v)            = wildcard v (wildcardUpperBound v)
+    fold' (UnionVersionRanges v1 v2)     = union' (fold' v1) (fold' v2)
+    fold' (IntersectVersionRanges v1 v2) = intersect' (fold' v1) (fold' v2)
+    fold' (VersionRangeParens v)         = parens (fold' v)
 
 wildcardUpperBound :: Version -> Version
 wildcardUpperBound (Version lowerBound ts) = (Version upperBound ts)

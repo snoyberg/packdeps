@@ -11,16 +11,13 @@ module Settings
     ) where
 
 import Prelude
-import Text.Shakespeare.Text (st)
 import Language.Haskell.TH.Syntax
 import Yesod.Default.Config
-import qualified Yesod.Default.Util
 import Yesod.Default.Util
 import Data.Default (def)
 import Text.Hamlet
 import Data.Text (Text)
 import Data.Yaml
-import Control.Applicative
 import Settings.Development
 
 -- Static setting below. Changing these requires a recompile

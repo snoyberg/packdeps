@@ -1,21 +1,17 @@
 {-# LANGUAGE NoImplicitPrelude, GeneralizedNewtypeDeriving, RecordWildCards, OverloadedStrings, DeriveGeneric, FlexibleInstances, TypeOperators #-}
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 module Distribution.PackDeps.Types where
 
-import Control.Exception (assert)
-import ClassyPrelude.Conduit
+import ClassyPrelude.Conduit hiding (pi)
 import GHC.Generics
-import Prelude (zip)
 
-import Prelude (show, tail)
 import Distribution.Text (display)
 import qualified Distribution.Version as D
-import qualified Data.HashMap.Strict as H
 import Data.Vector ((!))
 
 import Data.Binary (Binary (..), putWord8, getWord8, Put, Get)
 import qualified Control.Monad.Trans.RWS as RWS
 import Control.Monad.Trans.RWS hiding (get, put)
-import Data.Hashable (hashWithSalt)
 import qualified Data.Map as Map
 import Control.DeepSeq
 
