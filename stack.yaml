@@ -1,8 +1,8 @@
-resolver: lts-3.6
+resolver: lts-6.30
 image:
   container:
     name: snoyberg/packdeps
-    base: fpco/stack-run
+    base: fpco/stack-run:lts-6.30
     add:
       config: /app/config
       static: /app/static
