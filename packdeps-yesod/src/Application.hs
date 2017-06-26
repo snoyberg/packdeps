@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -61,7 +62,11 @@ loadData update' = do
             hFlush stderr
     log "Entered loadData"
     req' <- parseUrlThrow "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
+#if MIN_VERSION_http_client(0,5,0)
+    let req = req' { responseTimeout = responseTimeoutMicro 30000000 }
+#else
     let req = req' { responseTimeout = Just 30000000 }
+#endif
     forever $ do
         log "In forever"
         res <- try $ do

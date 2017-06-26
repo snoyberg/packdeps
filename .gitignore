@@ -2,7 +2,9 @@
 client_session_key.aes
 newest
 /dist/
+/dist-newstyle/
+.ghc.environment.*
 static/tmp/
 yesod-devel/
-/.stack-work/
+.stack-work/
 /tarballs/
