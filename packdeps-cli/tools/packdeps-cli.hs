@@ -1,22 +1,32 @@
+import Control.Applicative (some)
 import Distribution.PackDeps
 import Control.Monad (forM_, foldM, when)
-import System.Environment (getArgs, getProgName)
 import System.Exit (exitFailure, exitSuccess)
 import Distribution.Text (display)
 import Distribution.Package (PackageName (PackageName))
 import Distribution.Version (Version)
 import Control.Monad (liftM)
+import Data.Semigroup ((<>))
+
+import qualified Options.Applicative as O
 
 main :: IO ()
 main = do
-    args <- getArgs
-    case args of
-        [] -> usageExit
-        ["help"] -> usageExit
-        _ | "-h" `elem` args || "--help" `elem` args -> usageExit
-        _ -> do
-            isGood <- run ("--recursive" `elem` args) ("--quiet" `elem` args) (filter (\arg -> arg /= "--recursive" && arg /= "--quiet") args)
-            if isGood then exitSuccess else exitFailure
+    run' <- O.execParser $ O.info (O.helper <*> opts) $ mconcat
+        [ O.fullDesc
+        , O.progDesc $ unwords
+            [ "Check the given cabal file's dependency list to make sure that it does not exclude"
+            , "the newest package available. It's probably worth running the 'cabal update' command"
+            , "immediately before running this program."
+            ]
+        ]
+    isGood <- run'
+    if isGood then exitSuccess else exitFailure
+  where
+    opts = run
+        <$> O.switch (O.long "recursive" <> O.help "Check transitive dependencies as well")
+        <*> O.switch (O.long "quiet" <> O.help "Suppress output for .cabal files which can accept the newest packages available.")
+        <*> some (O.strArgument (O.metavar "pkgname.cabal"))
 
 type CheckDeps = Newest -> DescInfo -> (PackageName, Version, CheckDepsRes)
 
@@ -66,19 +76,6 @@ run deep quiet args = do
 
 unPackageName :: PackageName -> String
 unPackageName (PackageName n) = n
-
-
-usageExit :: IO a
-usageExit = do
-    pname <- getProgName
-    putStrLn $ "\n"
-        ++ "Usage: " ++ pname ++ " [--recursive] [--quiet] pkgname.cabal pkgname2.cabal...\n\n"
-        ++ "Check the given cabal file's dependency list to make sure that it does not exclude\n"
-        ++ "the newest package available. Its probably worth running the 'cabal update' command\n"
-        ++ "immediately before running this program.\n\n"
-        ++ "  --quiet\n"
-        ++ "      Suppress output for .cabal files which can accept the newest packages available.\n"
-    exitSuccess
 
 -- | Non short-circuiting monadic version of 'all'
 -- Duh, pre-AMP code.

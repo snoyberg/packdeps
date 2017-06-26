@@ -2,6 +2,8 @@ resolver: lts-6.30
 packages:
 - packdeps-cli
 - packdeps-yesod
+extra-deps:
+- optparse-applicative-0.14.0.0
 image:
   container:
     name: snoyberg/packdeps
