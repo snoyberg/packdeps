@@ -40,7 +40,9 @@ executable             packdeps
     build-depends:   base                      >= 4        && < 5
                    , Cabal
                    , optparse-applicative      >=0.14 && <0.15
+                   , containers
                    , semigroups
+                   , process
                    , packdeps
 
 source-repository head

@@ -1,13 +1,18 @@
 import Control.Applicative (some)
-import Distribution.PackDeps
 import Control.Monad (forM_, foldM, when)
-import System.Exit (exitFailure, exitSuccess)
-import Distribution.Text (display)
-import Distribution.Package (PackageName (PackageName))
-import Distribution.Version (Version)
 import Control.Monad (liftM)
+import Data.List (foldl')
+import Data.Maybe (mapMaybe)
 import Data.Semigroup ((<>))
+import Distribution.Compat.ReadP (readP_to_S)
+import Distribution.PackDeps
+import Distribution.Package (PackageIdentifier (PackageIdentifier), PackageName (PackageName))
+import Distribution.Text (display, parse)
+import Distribution.Version (Version)
+import System.Exit (exitFailure, exitSuccess)
+import System.Process (readProcess)
 
+import qualified Data.Map as Map
 import qualified Options.Applicative as O
 
 main :: IO ()
@@ -26,6 +31,7 @@ main = do
     opts = run
         <$> O.switch (O.long "recursive" <> O.help "Check transitive dependencies as well")
         <*> O.switch (O.long "quiet" <> O.help "Suppress output for .cabal files which can accept the newest packages available.")
+        <*> O.switch (O.long "ghc-pkg" <> O.help "Use ghc-pkg list to additionally populate the newest packages database.")
         <*> some (O.strArgument (O.metavar "pkgname.cabal"))
 
 type CheckDeps = Newest -> DescInfo -> (PackageName, Version, CheckDepsRes)
@@ -53,12 +59,31 @@ checkDepsCli quiet cd newest di =
             forM_ p $ \(x, y) -> putStrLn $ x ++ " " ++ y
             return False
 
+-- TODO
+updateWithGhcPkg :: Newest -> IO Newest
+updateWithGhcPkg newest = do
+    output <- readProcess "ghc-pkg" ["list", "--simple-output"] ""
+    let pkgs = mapMaybe parseSimplePackInfo (words output)
+    return $ foldl' apply newest pkgs
+  where
+    apply :: Newest -> (String, PackInfo) -> Newest
+    apply m (k, v) = Map.insert k v m
+
+    parseSimplePackInfo :: String -> Maybe (String, PackInfo)
+    parseSimplePackInfo str =
+        case filter ((== "") . snd) $ readP_to_S parse str of
+            ((PackageIdentifier (PackageName name) ver, _) : _) ->
+                Just (name, PackInfo ver Nothing 0)
+            _ -> Nothing
+
 run :: Bool        -- ^ Check transitive dependencies
     -> Bool        -- ^ Quiet -- only report packages that are not up to date
+    -> Bool        -- ^ ghc-pkg -- use ghc-pkg list to see whether there are even newer packages.
     -> [FilePath]  -- ^ .cabal filenames
     -> IO Bool
-run deep quiet args = do
-    newest <- loadNewest
+run deep quiet ghcpkg args = do
+    newest' <- loadNewest
+    newest <- if ghcpkg then updateWithGhcPkg newest' else return newest'
     foldM (go newest) True args
   where
     go newest wasAllGood fp = do
