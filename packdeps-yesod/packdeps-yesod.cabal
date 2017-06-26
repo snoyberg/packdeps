@@ -92,7 +92,7 @@ library
                  , lens
                  , conduit-extra
 
-executable         packdeps
+executable         packdeps-server
     if flag(library-only)
         Buildable: False
 
