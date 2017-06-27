@@ -85,8 +85,10 @@ instance Yesod App where
                     Just (_, _, _, x) -> Just x
 
         pc <- widgetToPageContent $ do
-            -- $(widgetFile "normalize")
-            -- addStylesheet $ StaticR css_bootstrap_css
+            {- why this are commented?
+            $(widgetFile "normalize")
+            addStylesheet $ StaticR css_bootstrap_css
+            -}
             $(widgetFile "default-layout")
         withUrlRenderer $(hamletFile "templates/default-layout-wrapper.hamlet")
 
