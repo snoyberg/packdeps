@@ -1,4 +1,4 @@
-exec: ../dist/build/packdeps/packdeps
+exec: ../dist/build/packdeps/packdeps-server
 args:
     - production
 host: packdeps.haskellers.com

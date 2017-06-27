@@ -21,6 +21,7 @@ Flag library-only
     Default:       False
 
 library
+    hs-source-dirs:  src
     exposed-modules: Application
                      Foundation
                      Import
@@ -70,6 +71,7 @@ library
                  , directory                     >= 1.1
                  , warp                          >= 1.3
                  , http-conduit
+                 , http-client
                  , http-client-tls
                  , conduit                       >= 0.5
                  , time
@@ -90,7 +92,7 @@ library
                  , lens
                  , conduit-extra
 
-executable         packdeps
+executable         packdeps-server
     if flag(library-only)
         Buildable: False
 

@@ -1,4 +1,7 @@
 resolver: lts-6.30
+packages:
+- packdeps-cli
+- packdeps-yesod
 image:
   container:
     name: snoyberg/packdeps

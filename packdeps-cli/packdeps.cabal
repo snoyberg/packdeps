@@ -1,0 +1,46 @@
+name:            packdeps
+version:         0.4.3
+license:         BSD3
+license-file:    LICENSE
+author:          Michael Snoyman <michael@snoyman.com>
+maintainer:      Michael Snoyman <michael@snoyman.com>
+synopsis:        Check your cabal packages for lagging dependencies.
+description:
+    This provides a library and command line tool for checking if the upper bounds in your package's dependency list excludes the newest package available. The code was originally available only as a web interface at <http://packdeps.haskellers.com/>, but is now available for standalone use as well.
+    .
+    The command line tool has an incredibly simple interface: simply pass it a list of cabal files, and it will tell you what dependencies- if any- are restricted.
+category:        Distribution
+stability:       Stable
+cabal-version:   >= 1.8
+build-type:      Simple
+homepage:        http://packdeps.haskellers.com/
+extra-source-files: README.md ChangeLog.md
+
+library
+    hs-source-dirs: src
+    build-depends:   base                      >= 4.6      && < 5
+                   , tar                       >= 0.4      && < 0.6
+                   , split                     >= 0.1.2.3
+                   , bytestring                >= 0.9
+                   , text                      >= 0.7
+                   , Cabal                     >= 1.14     && <1.25
+                   , time                      >= 1.1.4
+                   , containers                >= 0.2
+                   , directory                 >= 1.0
+                   , filepath                  >= 1.1
+    exposed-modules: Distribution.PackDeps
+    ghc-options:     -Wall
+
+executable             packdeps
+    main-is:           packdeps-cli.hs
+    hs-source-dirs:    tools
+
+    ghc-options:       -Wall
+
+    build-depends:   base                      >= 4        && < 5
+                   , Cabal
+                   , packdeps
+
+source-repository head
+  type:     git
+  location: git://github.com/snoyberg/packdeps.git
