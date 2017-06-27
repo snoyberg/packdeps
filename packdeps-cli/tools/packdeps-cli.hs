@@ -1,4 +1,4 @@
-import Control.Applicative (some)
+import Control.Applicative (many, some)
 import Control.Monad (forM_, foldM, when)
 import Control.Monad (liftM)
 import Data.List (foldl')
@@ -29,16 +29,17 @@ main = do
     if isGood then exitSuccess else exitFailure
   where
     opts = run
-        <$> O.switch (O.long "recursive" <> O.help "Check transitive dependencies as well")
-        <*> O.switch (O.long "quiet" <> O.help "Suppress output for .cabal files which can accept the newest packages available.")
-        <*> O.switch (O.long "ghc-pkg" <> O.help "Use ghc-pkg list to additionally populate the newest packages database.")
+        <$> O.switch (O.short 'r' <> O.long "recursive" <> O.help "Check transitive dependencies as well.")
+        <*> O.switch (O.short 'q' <> O.long "quiet" <> O.help "Suppress output for .cabal files which can accept the newest packages available.")
+        <*> O.switch (O.short 'g' <> O.long "ghc-pkg" <> O.help "Use ghc-pkg list to additionally populate the newest packages database.")
+        <*> many (O.strOption (O.short 'e' <> O.long "exclude" <> O.metavar "pkgname" <> O.help "Exclude the package from the output."))
         <*> some (O.strArgument (O.metavar "pkgname.cabal"))
 
 type CheckDeps = Newest -> DescInfo -> (PackageName, Version, CheckDepsRes)
 
-checkDepsCli :: Bool -> CheckDeps -> Newest -> DescInfo -> IO Bool
-checkDepsCli quiet cd newest di =
-    case cd newest di of
+checkDepsCli :: Bool -> [String] -> CheckDeps -> Newest -> DescInfo -> IO Bool
+checkDepsCli quiet excludes cd newest di =
+    case overTrd filterExcludes $ cd newest di of
         (pn, v, AllNewest)
           | quiet -> return True
           | otherwise -> do
@@ -58,6 +59,16 @@ checkDepsCli quiet cd newest di =
                 ]
             forM_ p $ \(x, y) -> putStrLn $ x ++ " " ++ y
             return False
+  where
+    overTrd :: (a -> b) -> (x, y, a) -> (x, y, b)
+    overTrd f (x, y, a) = (x, y, f a)
+
+    filterExcludes :: CheckDepsRes -> CheckDepsRes
+    filterExcludes AllNewest = AllNewest
+    filterExcludes (WontAccept p t) =
+        case filter (\(n, _) -> n `notElem` excludes) p of
+            [] -> AllNewest
+            p' -> WontAccept p' t
 
 -- TODO
 updateWithGhcPkg :: Newest -> IO Newest
@@ -79,9 +90,10 @@ updateWithGhcPkg newest = do
 run :: Bool        -- ^ Check transitive dependencies
     -> Bool        -- ^ Quiet -- only report packages that are not up to date
     -> Bool        -- ^ ghc-pkg -- use ghc-pkg list to see whether there are even newer packages.
+    -> [String]    -- ^ packages to exclude
     -> [FilePath]  -- ^ .cabal filenames
     -> IO Bool
-run deep quiet ghcpkg args = do
+run deep quiet ghcpkg excludes args = do
     newest' <- loadNewest
     newest <- if ghcpkg then updateWithGhcPkg newest' else return newest'
     foldM (go newest) True args
@@ -91,10 +103,10 @@ run deep quiet ghcpkg args = do
         di <- case mdi of
              Just di -> return di
              Nothing -> error $ "Could not parse cabal file: " ++ fp
-        allGood <- checkDepsCli quiet checkDeps newest di
+        allGood <- checkDepsCli quiet excludes checkDeps newest di
         depsGood <- if deep
                        then do putStrLn $ "\nTransitive dependencies:"
-                               allM (checkDepsCli quiet checkLibDeps newest) (deepLibDeps newest [di])
+                               allM (checkDepsCli quiet excludes checkLibDeps newest) (deepLibDeps newest [di])
                        else return True
         when (not (allGood && depsGood)) $ putStrLn ""
         return $ wasAllGood && allGood && depsGood
