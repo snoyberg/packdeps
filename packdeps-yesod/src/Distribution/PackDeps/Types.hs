@@ -62,6 +62,11 @@ instance Binary' a => Binary' (Vector a) where
     get' = do
         l <- get
         replicateM l get'
+instance (Unbox a, Binary' a) => Binary' (UVector a) where
+    put' v = put (length v) >> mapM_ put' v
+    get' = do
+        l <- get
+        replicateM l get'
 instance (Binary' a, Binary' b) => Binary' (a, b) where
     put' (a, b) = put' a >> put' b
     get' = (,) <$> get' <*> get'
@@ -285,7 +290,7 @@ newtype PackageName = PackageName { unPackageName :: Text }
     deriving (Read, Show, Eq, Ord, Hashable, Binary', NFData)
 
 data Version = Version
-    { versionBranch :: !(Vector Int)
+    { versionBranch :: !(UVector Int)
     , versionTags   :: !(Vector Text)
     }
     deriving (Eq, Ord, Generic)
