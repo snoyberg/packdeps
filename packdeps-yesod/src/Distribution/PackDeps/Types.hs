@@ -289,17 +289,16 @@ data VersionRange version
 newtype PackageName = PackageName { unPackageName :: Text }
     deriving (Read, Show, Eq, Ord, Hashable, Binary', NFData)
 
-data Version = Version
-    { versionBranch :: !(UVector Int)
-    , versionTags   :: !(Vector Text)
+newtype Version = Version
+    { versionBranch :: UVector Int
     }
     deriving (Eq, Ord, Generic)
 
 instance Hashable Version where
-    hashWithSalt i (Version x y) = hashWithSalt i (unpack x, unpack y)
+    hashWithSalt i (Version x) = hashWithSalt i (unpack x)
 
 instance Show Version where
-    show (Version x y) = display $ D.Version (unpack x) (map unpack $ unpack y)
+    show (Version x) = display $ D.Version (unpack x) []
 
 m'ToM :: Maybe' a -> Maybe a
 m'ToM Nothing' = Nothing
@@ -318,7 +317,7 @@ instance Show (VersionRange Version) where
         unVR (IntersectVersionRanges x y) = D.IntersectVersionRanges (unVR x) (unVR y)
         unVR (VersionRangeParens x) = D.VersionRangeParens (unVR x)
 
-        unV (Version x y) = D.Version (unpack x) (map unpack $ unpack y)
+        unV (Version x) = D.Version (unpack x) []
 
 newtype License = License { unLicense :: Text }
     deriving (Show, Eq, Ord, Binary', Hashable, NFData)

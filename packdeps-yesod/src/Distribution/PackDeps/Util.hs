@@ -4,7 +4,6 @@ module Distribution.PackDeps.Util where
 
 import ClassyPrelude.Conduit
 import Distribution.PackDeps.Types
-import qualified Data.Vector as Vector
 import qualified Data.Vector.Unboxed as UVector
 import qualified Distribution.Version as D
 
@@ -78,7 +77,7 @@ foldVersionRange' anyv this later earlier orLater orEarlier
     fold' (VersionRangeParens v)         = parens (fold' v)
 
 wildcardUpperBound :: Version -> Version
-wildcardUpperBound (Version lowerBound ts) = (Version upperBound ts)
+wildcardUpperBound (Version lowerBound) = (Version upperBound)
   where
     upperBound = UVector.init lowerBound `UVector.snoc` (UVector.last lowerBound + 1)
 
@@ -99,4 +98,4 @@ convertVersionRange =
     goR (D.VersionRangeParens x) = VersionRangeParens $ goR x
 
 convertVersion :: D.Version -> Version
-convertVersion (D.Version x y) = Version (UVector.fromList x) (Vector.fromList $ map pack y)
+convertVersion (D.Version x _) = Version (UVector.fromList x)
