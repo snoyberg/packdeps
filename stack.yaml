@@ -10,5 +10,5 @@ image:
     name: snoyberg/packdeps
     base: fpco/stack-run:lts-6.30
     add:
-      config: /app/config
-      static: /app/static
+      packdeps-yesod/config: /app/config
+      packdeps-yesod/static: /app/static
