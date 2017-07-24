@@ -38,7 +38,7 @@ getLicensesR = do
 getLicenseR :: Text -> Handler Html
 getLicenseR package = do
     (m, params) <- getLicenses
-    Licenses licenses <- maybe notFound return $ Map.lookup (PackageName package) m
+    Licenses licenses <- maybe notFound return $ Map.lookup (mkPackageName package) m
     defaultLayout $ do
         setTitle $ toHtml $ package <> " :: Licenses"
         addToggle

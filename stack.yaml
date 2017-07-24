@@ -4,6 +4,7 @@ packages:
 - packdeps-yesod
 extra-deps:
 - optparse-applicative-0.14.0.0
+- Cabal-2.0.0.2
 image:
   container:
     name: snoyberg/packdeps

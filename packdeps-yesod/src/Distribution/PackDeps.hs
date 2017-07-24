@@ -2,6 +2,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE ViewPatterns #-}
 module Distribution.PackDeps
     ( -- * Data types
       Newest (..)
@@ -50,6 +51,7 @@ import Distribution.Package hiding (PackageName)
 import qualified Distribution.Package as D
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
+import Distribution.Types.CondTree (CondBranch (..))
 import qualified Distribution.Version as D
 import Distribution.Text hiding (Text)
 
@@ -114,7 +116,7 @@ addPackage (Newest m, count) entry = do
     (m', count') =
       case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
         [package', versionS, _] ->
-            let package'' = PackageName $ pack package'
+            let package'' = PackageName $ D.mkPackageName package'
              in case fmap convertVersion $ simpleParse versionS of
                     _ | package' == "acme-everything" -> (m, count) -- takes too long to parse
                     Just version ->
@@ -181,12 +183,12 @@ getDescInfo gpd = (DescInfo
     }, License $ pack $ display $ license $ packageDescription gpd)
   where
     p = packageDescription gpd
-    PackageIdentifier (D.PackageName name) _version = package p
+    PackageIdentifier (D.unPackageName -> name) _version = package p
 
 getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange (VersionRange Version))
 getDeps gpd = HMap.map (fmap convertVersionRange)
             $ foldr (HMap.unionWith mappend) HMap.empty
-            $ map (\(Dependency (D.PackageName k) v, pu) -> HMap.singleton (PackageName $ pack k) (PUVersionRange pu v))
+            $ map (\(Dependency k v, pu) -> HMap.singleton (PackageName k) (PUVersionRange pu v))
             $ mconcat
                 [ maybe mempty (go Runtime) $ condLibrary gpd
                 , mconcat $ map (go Runtime . snd) $ condExecutables gpd
@@ -223,7 +225,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
         Just base46 = simpleParse "4.6.0.0"
 
         ok :: Dependency -> Bool
-        ok (Dependency (D.PackageName "base") range) = base46 `D.withinRange` range
+        ok (Dependency (D.unPackageName -> "base") range) = base46 `D.withinRange` range
         ok _ = True
 
     go' flagMap tree
@@ -231,7 +233,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
         $ condTreeConstraints tree
         : map (go' flagMap) (mapMaybe (checkCond flagMap) $ condTreeComponents tree)
 
-    checkCond flagMap (cond, tree, melse)
+    checkCond flagMap (CondBranch cond tree melse)
         | checkCond' flagMap cond = Just tree
         | otherwise = melse
 
@@ -301,7 +303,7 @@ getPackage s (Newest n) = do
 -- | Parse information on a package from the contents of a cabal file.
 parsePackage :: L.ByteString -> Maybe' (DescInfo PackageName Version, License)
 parsePackage lbs =
-    case parsePackageDescription $ T.unpack
+    case parseGenericPackageDescription $ T.unpack
        $ T.decodeUtf8With T.lenientDecode lbs of
         ParseOk _ x -> Just' $ getDescInfo x
         _ -> Nothing'

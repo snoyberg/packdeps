@@ -19,7 +19,7 @@ import Distribution.PackDeps.Util (withinRange)
 import Control.Arrow ((&&&))
 import Data.List (sortBy)
 import Data.Ord (comparing)
-import Distribution.PackDeps.Types (Version, PackageName (..))
+import Distribution.PackDeps.Types (Version, PackageName, unPackageName, mkPackageName)
 import Yesod.Form.Jquery (urlJqueryJs)
 
 getHomeR :: Handler Html
@@ -91,7 +91,7 @@ getSpecificR :: Handler Html
 getSpecificR = do
     packages' <- lookupGetParams "package"
     (newest, _) <- getData
-    let packages = map (id &&& flip getPackage newest) $ map PackageName packages'
+    let packages = map (id &&& flip getPackage newest) $ map mkPackageName packages'
     let title = "Newer dependencies for your Hackage packages" :: Text
     let checkDeps' x =
             case checkDeps newest x of
@@ -106,9 +106,9 @@ getSpecificR = do
 getSpecificFeedR :: Text -> Handler TypedContent
 getSpecificFeedR packages' = do
     (newest, _) <- getData
-    let descs = mapMaybe (flip getPackage newest . PackageName) $ T.words packages'
+    let descs = mapMaybe (flip getPackage newest . mkPackageName) $ T.words packages'
     let go (_, _, AllNewest) = Nothing
-        go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
+        go (unPackageName -> x, v, WontAccept y z) = Just ((x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
              $ mapMaybe (go . checkDeps newest) descs
     now <- liftIO getCurrentTime
@@ -154,7 +154,7 @@ getReverseListR = do
 getReverseR :: Text -> Handler Html
 getReverseR dep = do
     (_, reverse') <- getData
-    (version, rels) <- maybe notFound return $ H.lookup (PackageName dep) reverse'
+    (version, rels) <- maybe notFound return $ H.lookup (mkPackageName dep) reverse'
     y <- getYesod
     defaultLayout $ do
         setTitle [shamlet|Reverse dependencies for #{dep}|]

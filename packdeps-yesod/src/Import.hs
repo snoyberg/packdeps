@@ -35,6 +35,7 @@ import Data.Maybe (mapMaybe)
 import Data.Ord (comparing)
 import Data.List (sortBy)
 import Distribution.PackDeps.Types (PackageName (PackageName), Version)
+import Distribution.Types.PackageName (unPackageName)
 import Data.IORef (readIORef)
 
 #if __GLASGOW_HASKELL__ < 704
@@ -62,7 +63,7 @@ getDeps deep needle = do
     let descs' = filterPackages needle newest
         descs = if deep then deepDeps newest descs' else descs'
         go (_, _, AllNewest) = Nothing
-        go (PackageName x, v, WontAccept y z) = Just ((x, v), (y, z))
+        go (PackageName x, v, WontAccept y z) = Just ((pack $ unPackageName x, v), (y, z))
         deps = reverse $ sortBy (comparing $ snd . snd)
              $ mapMaybe (go . checkDeps newest) descs
     return (descs, deps)

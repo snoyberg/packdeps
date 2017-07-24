@@ -13,5 +13,5 @@
                 <td>#{unLicense l}
                 <td>
                     <ul>
-                        $forall PackageName p <- ps
-                            <li>#{p}
+                        $forall p <- ps
+                            <li>#{unPackageName p}

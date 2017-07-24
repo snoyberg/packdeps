@@ -6,6 +6,7 @@ import ClassyPrelude.Conduit hiding (pi)
 import GHC.Generics
 
 import Distribution.Text (display)
+import qualified Distribution.Types.PackageName as D
 import qualified Distribution.Version as D
 import Data.Vector ((!))
 
@@ -89,9 +90,6 @@ instance Binary' (DescInfo NameId VersionId) where
     put' = gput . from
     get' = to <$> gget
 instance Binary' (VersionRange VersionId) where
-    put' = gput . from
-    get' = to <$> gget
-instance Binary' Version where
     put' = gput . from
     get' = to <$> gget
 instance Binary' Text where
@@ -286,19 +284,33 @@ data VersionRange version
   | VersionRangeParens     !(VersionRange version) -- just '(exp)' parentheses syntax
   deriving (Eq, Generic)
 
-newtype PackageName = PackageName { unPackageName :: Text }
-    deriving (Read, Show, Eq, Ord, Hashable, Binary', NFData)
+newtype PackageName = PackageName D.PackageName
+    deriving (Read, Show, Eq, Ord, NFData)
 
-newtype Version = Version
-    { versionBranch :: UVector Int
-    }
+instance Hashable PackageName where
+  hashWithSalt i (PackageName x) = hashWithSalt i (D.unPackageName x)
+instance Binary' PackageName where
+  put' (PackageName pn) = put (D.unPackageName pn)
+  get' = (PackageName . D.mkPackageName) <$> get
+
+unPackageName :: PackageName -> Text
+unPackageName (PackageName pn) = pack $ D.unPackageName pn
+
+mkPackageName :: Text -> PackageName
+mkPackageName = PackageName . D.mkPackageName . unpack
+
+newtype Version = Version D.Version
     deriving (Eq, Ord, Generic)
 
+instance Binary' Version where
+    put' (Version v) = put $ D.versionNumbers v
+    get' = (Version . D.mkVersion) <$> get
+
 instance Hashable Version where
-    hashWithSalt i (Version x) = hashWithSalt i (unpack x)
+    hashWithSalt i (Version x) = hashWithSalt i $ D.versionNumbers x
 
 instance Show Version where
-    show (Version x) = display $ D.Version (unpack x) []
+    show (Version x) = display x
 
 m'ToM :: Maybe' a -> Maybe a
 m'ToM Nothing' = Nothing
@@ -317,7 +329,7 @@ instance Show (VersionRange Version) where
         unVR (IntersectVersionRanges x y) = D.IntersectVersionRanges (unVR x) (unVR y)
         unVR (VersionRangeParens x) = D.VersionRangeParens (unVR x)
 
-        unV (Version x) = D.Version (unpack x) []
+        unV (Version x) = x
 
 newtype License = License { unLicense :: Text }
     deriving (Show, Eq, Ord, Binary', Hashable, NFData)
