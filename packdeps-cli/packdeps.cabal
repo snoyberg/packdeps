@@ -1,5 +1,5 @@
 name:            packdeps
-version:         0.4.3
+version:         0.4.4
 license:         BSD3
 license-file:    LICENSE
 author:          Michael Snoyman <michael@snoyman.com>
@@ -23,7 +23,7 @@ library
                    , split                     >= 0.1.2.3
                    , bytestring                >= 0.9
                    , text                      >= 0.7
-                   , Cabal                     >= 1.14     && <1.25
+                   , Cabal                     >= 2.0      && < 2.1
                    , time                      >= 1.1.4
                    , containers                >= 0.2
                    , directory                 >= 1.0

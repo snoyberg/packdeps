@@ -1,3 +1,8 @@
+## 0.4.4
+
+* Switch over to Cabal 2.0. (Normally it would be better to keep
+  backwards compat, but the API breakage is too high.)
+
 ## 0.4.3
 
 * Updates (better cabal config parsing) [#30](https://github.com/snoyberg/packdeps/pull/30)

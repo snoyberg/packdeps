@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Distribution.PackDeps
     ( -- * Data types
       Newest
@@ -151,7 +152,7 @@ getReverses newest =
     toTuples (_, PackInfo { piDesc = Nothing }) = []
     toTuples (rel, PackInfo { piDesc = Just DescInfo { diDeps = deps } }) =
         map (toTuple rel) deps
-    toTuple rel (Dependency (PackageName dep) range) = (dep, (rel, range))
+    toTuple rel (Dependency (unPackageName -> dep) range) = (dep, (rel, range))
     hoist :: Ord a => [(a, b)] -> [(a, [b])]
     hoist = map ((fst . head) &&& map snd)
           . groupBy ((==) `on` fst)
@@ -186,7 +187,7 @@ getDescInfo gpd = DescInfo
     }
   where
     p = packageDescription gpd
-    pi'@(PackageIdentifier (PackageName name) _) = package p
+    pi'@(PackageIdentifier (unPackageName -> name) _) = package p
     rev = fromMaybe 0 $ do
         r <- lookup "x-revision" (customFieldsPD p)
         readMaybe r
@@ -231,7 +232,7 @@ epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
 notNewest :: Newest -> Dependency -> Maybe ((String, String), Tar.EpochTime)
-notNewest newest (Dependency (PackageName s) range) =
+notNewest newest (Dependency (unPackageName -> s) range) =
     case Map.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
@@ -248,7 +249,7 @@ getPackage s n = Map.lookup s n >>= piDesc
 -- | Parse information on a package from the contents of a cabal file.
 parsePackage :: L.ByteString -> Maybe DescInfo
 parsePackage lbs =
-    case parsePackageDescription $ T.unpack
+    case parseGenericPackageDescription $ T.unpack
        $ T.decodeUtf8With T.lenientDecode lbs of
         ParseOk _ x -> Just $ getDescInfo x
         _ -> Nothing
@@ -287,19 +288,16 @@ deepDepsImpl deps newest dis0 =
         | name `Set.member` viewed = go viewed dis
         | otherwise = di : go viewed' (newDis ++ dis)
       where
-        PackageIdentifier (PackageName name) _ = diPackage di
+        PackageIdentifier name _ = diPackage di
         viewed' = Set.insert name viewed
         newDis = mapMaybe getDI $ deps di
         getDI :: Dependency -> Maybe DescInfo
-        getDI (Dependency (PackageName name') _) = do
-            pi' <- Map.lookup name' newest
+        getDI (Dependency name' _) = do
+            pi' <- Map.lookup (unPackageName name') newest
             piDesc pi'
 
 diName :: DescInfo -> String
-diName =
-    unPN . pkgName . diPackage
-  where
-    unPN (PackageName pn) = pn
+diName = unPackageName . pkgName . diPackage
 
 -------------------------------------------------------------------------------
 -- ~/.cabal/config parsing

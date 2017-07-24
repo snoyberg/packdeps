@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 import Control.Applicative (many, some)
 import Control.Monad (forM_, foldM, when)
 import Control.Monad (liftM)
@@ -6,7 +7,7 @@ import Data.Maybe (mapMaybe)
 import Data.Semigroup ((<>))
 import Distribution.Compat.ReadP (readP_to_S)
 import Distribution.PackDeps
-import Distribution.Package (PackageIdentifier (PackageIdentifier), PackageName (PackageName))
+import Distribution.Package (PackageIdentifier (PackageIdentifier), PackageName, unPackageName)
 import Distribution.Text (display, parse)
 import Distribution.Version (Version)
 import System.Exit (exitFailure, exitSuccess)
@@ -83,7 +84,7 @@ updateWithGhcPkg newest = do
     parseSimplePackInfo :: String -> Maybe (String, PackInfo)
     parseSimplePackInfo str =
         case filter ((== "") . snd) $ readP_to_S parse str of
-            ((PackageIdentifier (PackageName name) ver, _) : _) ->
+            ((PackageIdentifier (unPackageName -> name) ver, _) : _) ->
                 Just (name, PackInfo ver Nothing 0)
             _ -> Nothing
 
@@ -110,9 +111,6 @@ run deep quiet ghcpkg excludes args = do
                        else return True
         when (not (allGood && depsGood)) $ putStrLn ""
         return $ wasAllGood && allGood && depsGood
-
-unPackageName :: PackageName -> String
-unPackageName (PackageName n) = n
 
 -- | Non short-circuiting monadic version of 'all'
 -- Duh, pre-AMP code.
