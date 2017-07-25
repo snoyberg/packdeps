@@ -209,7 +209,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
 
     go :: PackageUsage -> CondTree ConfVar [Dependency] a -> [(Dependency, PackageUsage)]
     go pu tree = map (, pu) $
-        case filter allowsBase46 choices of
+        case filter allowsNewBase choices of
             [] ->
                 case choices of
                     [] -> []
@@ -218,14 +218,14 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
       where
         choices = map (flip go' tree) flagMaps
 
-    allowsBase46 :: [Dependency] -> Bool
-    allowsBase46 =
+    allowsNewBase :: [Dependency] -> Bool
+    allowsNewBase =
         all ok
       where
-        Just base46 = simpleParse "4.6.0.0"
+        Just newbase = simpleParse "4.10.0.0"
 
         ok :: Dependency -> Bool
-        ok (Dependency (D.unPackageName -> "base") range) = base46 `D.withinRange` range
+        ok (Dependency (D.unPackageName -> "base") range) = newbase `D.withinRange` range
         ok _ = True
 
     go' flagMap tree
