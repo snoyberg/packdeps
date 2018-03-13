@@ -41,15 +41,12 @@ import Control.Exception (throw)
 
 import Distribution.Package
 import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
+import Distribution.PackageDescription.Parsec
 import Distribution.Version
 import Distribution.Text
 import qualified Distribution.ParseUtils as PU
 
 import Data.Char (toLower)
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
-import qualified Data.Text.Encoding.Error as T
 import qualified Data.ByteString.Lazy as L
 
 import Data.List.Split (splitOn)
@@ -249,10 +246,9 @@ getPackage s n = Map.lookup s n >>= piDesc
 -- | Parse information on a package from the contents of a cabal file.
 parsePackage :: L.ByteString -> Maybe DescInfo
 parsePackage lbs =
-    case parseGenericPackageDescription $ T.unpack
-       $ T.decodeUtf8With T.lenientDecode lbs of
-        ParseOk _ x -> Just $ getDescInfo x
-        _ -> Nothing
+    case snd $  runParseResult $ parseGenericPackageDescription $ L.toStrict lbs of
+        Right x -> Just $ getDescInfo x
+        Left _  -> Nothing
 
 -- | Load a single package from a cabal file.
 loadPackage :: FilePath -> IO (Maybe DescInfo)
@@ -324,6 +320,6 @@ lookupInConfig key = mapMaybe f
     f _ = Nothing
 
 -- | Like 'either', but for 'ParseResult'
-parseResult :: (PU.PError -> r) -> (a -> r) -> ParseResult a -> r
+parseResult :: (PU.PError -> r) -> (a -> r) -> PU.ParseResult a -> r
 parseResult l _ (PU.ParseFailed e)    = l e
 parseResult _ r (PU.ParseOk _warns x) = r x
