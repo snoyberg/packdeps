@@ -33,6 +33,7 @@ main = do
         <$> O.switch (O.short 'r' <> O.long "recursive" <> O.help "Check transitive dependencies as well.")
         <*> O.switch (O.short 'q' <> O.long "quiet" <> O.help "Suppress output for .cabal files which can accept the newest packages available.")
         <*> O.switch (O.short 'g' <> O.long "ghc-pkg" <> O.help "Use ghc-pkg list to additionally populate the newest packages database.")
+        <*> O.switch (O.short 'p' <> O.long "preferred" <> O.help "Consider only preferred versions")
         <*> many (O.strOption (O.short 'e' <> O.long "exclude" <> O.metavar "pkgname" <> O.help "Exclude the package from the output."))
         <*> some (O.strArgument (O.metavar "pkgname.cabal"))
 
@@ -58,7 +59,7 @@ checkDepsCli quiet excludes cd newest di =
                 , display v
                 , ": Cannot accept the following packages"
                 ]
-            forM_ p $ \(x, y) -> putStrLn $ x ++ " " ++ y
+            forM_ p $ \(x, y) -> putStrLn $ display x ++ " " ++ display y
             return False
   where
     overTrd :: (a -> b) -> (x, y, a) -> (x, y, b)
@@ -67,7 +68,7 @@ checkDepsCli quiet excludes cd newest di =
     filterExcludes :: CheckDepsRes -> CheckDepsRes
     filterExcludes AllNewest = AllNewest
     filterExcludes (WontAccept p t) =
-        case filter (\(n, _) -> n `notElem` excludes) p of
+        case filter (\(n, _) -> display n `notElem` excludes) p of
             [] -> AllNewest
             p' -> WontAccept p' t
 
@@ -78,24 +79,25 @@ updateWithGhcPkg newest = do
     let pkgs = mapMaybe parseSimplePackInfo (words output)
     return $ foldl' apply newest pkgs
   where
-    apply :: Newest -> (String, PackInfo) -> Newest
+    apply :: Newest -> (PackageName, PackInfo) -> Newest
     apply m (k, v) = Map.insert k v m
 
-    parseSimplePackInfo :: String -> Maybe (String, PackInfo)
+    parseSimplePackInfo :: String -> Maybe (PackageName, PackInfo)
     parseSimplePackInfo str =
         case filter ((== "") . snd) $ readP_to_S parse str of
-            ((PackageIdentifier (unPackageName -> name) ver, _) : _) ->
+            ((PackageIdentifier name ver, _) : _) ->
                 Just (name, PackInfo ver Nothing 0)
             _ -> Nothing
 
 run :: Bool        -- ^ Check transitive dependencies
     -> Bool        -- ^ Quiet -- only report packages that are not up to date
     -> Bool        -- ^ ghc-pkg -- use ghc-pkg list to see whether there are even newer packages.
+    -> Bool        -- ^ preferred -- consider only preferred versions
     -> [String]    -- ^ packages to exclude
     -> [FilePath]  -- ^ .cabal filenames
     -> IO Bool
-run deep quiet ghcpkg excludes args = do
-    newest' <- loadNewest
+run deep quiet ghcpkg preferred excludes args = do
+    newest' <- loadNewest preferred
     newest <- if ghcpkg then updateWithGhcPkg newest' else return newest'
     foldM (go newest) True args
   where
