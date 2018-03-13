@@ -35,7 +35,7 @@ executable             packdeps
     main-is:           packdeps-cli.hs
     hs-source-dirs:    tools
 
-    ghc-options:       -Wall
+    ghc-options:       -Wall -rtsopts
 
     build-depends:   base                      >= 4        && < 5
                    , Cabal

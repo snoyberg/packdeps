@@ -34,7 +34,7 @@ import Control.Applicative as A ((<$>))
 import Control.Monad (guard)
 import System.Directory (getAppUserDataDirectory, doesFileExist)
 import System.FilePath ((</>))
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.List (foldl', group, sort, isInfixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
 import Data.Maybe (mapMaybe, fromMaybe)
@@ -49,6 +49,7 @@ import Distribution.Version
 import qualified Distribution.ParseUtils as PU
 
 import Data.Char (toLower)
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 
 import Data.List.Split (splitOn)
@@ -120,8 +121,9 @@ addPackage pref m entry =
   where
     go package' version =
         case Tar.entryContent entry of
-            Tar.NormalFile bs _ ->
-                Map.insertWith maxVersion package' PackInfo
+            Tar.NormalFile lbs _ ->
+                let bs = S.copy (L.toStrict lbs)
+                in bs `seq` Map.insertWith maxVersion package' PackInfo
                         { piVersion = version
                         , piDesc = parsePackage bs
                         , piEpoch = Tar.entryTime entry
@@ -143,12 +145,13 @@ simpleParsecLBS :: Parsec a => L.ByteString -> Maybe a
 simpleParsecLBS = either (const Nothing) Just
     . runParsecParser lexemeParsec "<simpleParsec>"
     . fieldLineStreamFromBS
+    . S.copy
     . L.toStrict
 
 data PackInfo = PackInfo
-    { piVersion  :: Version
-    , piDesc     :: Maybe DescInfo
-    , piEpoch    :: Tar.EpochTime
+    { piVersion  :: !Version
+    , piDesc     :: Maybe DescInfo -- this is deliberately lazy
+    , piEpoch    :: !Tar.EpochTime
     }
     deriving (Show, Read)
 
@@ -275,15 +278,15 @@ getPackage :: PackageName -> Newest -> Maybe DescInfo
 getPackage s n = Map.lookup s n >>= piDesc
 
 -- | Parse information on a package from the contents of a cabal file.
-parsePackage :: L.ByteString -> Maybe DescInfo
-parsePackage lbs =
-    case snd $  runParseResult $ parseGenericPackageDescription $ L.toStrict lbs of
+parsePackage :: S.ByteString -> Maybe DescInfo
+parsePackage bs =
+    case snd $ runParseResult $ parseGenericPackageDescription bs of
         Right x -> Just $ getDescInfo x
         Left _  -> Nothing
 
 -- | Load a single package from a cabal file.
 loadPackage :: FilePath -> IO (Maybe DescInfo)
-loadPackage = fmap parsePackage . L.readFile
+loadPackage = fmap parsePackage . S.readFile
 
 -- | Find all of the packages matching a given search string.
 filterPackages :: String -> Newest -> [DescInfo]
