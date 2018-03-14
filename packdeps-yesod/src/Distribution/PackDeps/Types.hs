@@ -14,7 +14,6 @@ import Data.Binary (Binary (..), putWord8, getWord8, Put, Get)
 import qualified Control.Monad.Trans.RWS as RWS
 import Control.Monad.Trans.RWS hiding (get, put)
 import qualified Data.Map as Map
-import Control.DeepSeq
 
 class GBinary f where
     gput :: f a -> Put
@@ -188,6 +187,9 @@ newestToIds (Newest newest) =
     goVR (UnionVersionRanges x y) = UnionVersionRanges <$> goVR x <*> goVR y
     goVR (IntersectVersionRanges x y) = IntersectVersionRanges <$> goVR x <*> goVR y
     goVR (VersionRangeParens x) = VersionRangeParens <$> goVR x
+    goVR (MajorBoundVersion x) = MajorBoundVersion <$> getVersion x
+    goVR (OrLaterVersion x) = OrLaterVersion <$> getVersion x
+    goVR (OrEarlierVersion x) = OrEarlierVersion <$> getVersion x
 
 newestFromIds :: NewestIds -> Newest
 newestFromIds (NewestIds nameV versionV licenseV pairs) =
@@ -218,6 +220,9 @@ newestFromIds (NewestIds nameV versionV licenseV pairs) =
     goVR (UnionVersionRanges x y) = UnionVersionRanges (goVR x) (goVR y)
     goVR (IntersectVersionRanges x y) = IntersectVersionRanges (goVR x) (goVR y)
     goVR (VersionRangeParens x) = VersionRangeParens (goVR x)
+    goVR (MajorBoundVersion v) = MajorBoundVersion $ getVersion v
+    goVR (OrLaterVersion v) = OrLaterVersion $ getVersion v
+    goVR (OrEarlierVersion v) = OrEarlierVersion $ getVersion v
 
 instance Binary Newest where
     put = put . newestToIds
@@ -282,6 +287,9 @@ data VersionRange version
   | UnionVersionRanges     !(VersionRange version) !(VersionRange version)
   | IntersectVersionRanges !(VersionRange version) !(VersionRange version)
   | VersionRangeParens     !(VersionRange version) -- just '(exp)' parentheses syntax
+  | MajorBoundVersion      !version -- ^>= version
+  | OrLaterVersion         !version -- >= version
+  | OrEarlierVersion       !version -- <= version
   deriving (Eq, Generic)
 
 newtype PackageName = PackageName D.PackageName
@@ -328,6 +336,9 @@ instance Show (VersionRange Version) where
         unVR (UnionVersionRanges x y) = D.UnionVersionRanges (unVR x) (unVR y)
         unVR (IntersectVersionRanges x y) = D.IntersectVersionRanges (unVR x) (unVR y)
         unVR (VersionRangeParens x) = D.VersionRangeParens (unVR x)
+        unVR (MajorBoundVersion v) = D.MajorBoundVersion (unV v)
+        unVR (OrLaterVersion v) = D.OrLaterVersion (unV v)
+        unVR (OrEarlierVersion v) = D.OrEarlierVersion (unV v)
 
         unV (Version x) = x
 

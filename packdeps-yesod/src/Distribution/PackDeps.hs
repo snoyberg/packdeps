@@ -48,17 +48,15 @@ import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
 
 import Distribution.Package hiding (PackageName)
+import Distribution.License (licenseFromSPDX)
 import qualified Distribution.Package as D
 import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
+import Distribution.PackageDescription.Parsec
 import Distribution.Types.CondTree (CondBranch (..))
 import qualified Distribution.Version as D
 import Distribution.Text hiding (Text)
 
 import qualified Data.Text as TS
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
-import qualified Data.Text.Encoding.Error as T
 import qualified Data.ByteString.Lazy as L
 
 import Data.List.Split (splitOn)
@@ -180,7 +178,7 @@ getDescInfo gpd = (DescInfo
     { diHaystack = toCaseFold $ pack $ unlines [author p, maintainer p, name]
     , diDeps = getDeps gpd
     , diSynopsis = pack $ synopsis p
-    }, License $ pack $ display $ license $ packageDescription gpd)
+    }, License $ pack $ display $ licenseFromSPDX $ license $ packageDescription gpd)
   where
     p = packageDescription gpd
     PackageIdentifier (D.unPackageName -> name) _version = package p
@@ -303,10 +301,9 @@ getPackage s (Newest n) = do
 -- | Parse information on a package from the contents of a cabal file.
 parsePackage :: L.ByteString -> Maybe' (DescInfo PackageName Version, License)
 parsePackage lbs =
-    case parseGenericPackageDescription $ T.unpack
-       $ T.decodeUtf8With T.lenientDecode lbs of
-        ParseOk _ x -> Just' $ getDescInfo x
-        _ -> Nothing'
+    case snd $ runParseResult $ parseGenericPackageDescription $ L.toStrict lbs of
+        Right x -> Just' $ getDescInfo x
+        Left _ -> Nothing'
 
 -- | Load a single package from a cabal file.
 loadPackage :: FilePath -> IO (Maybe' (DescInfo PackageName Version))

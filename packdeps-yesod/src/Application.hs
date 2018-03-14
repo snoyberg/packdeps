@@ -23,7 +23,7 @@ import Control.Monad (forever)
 import Control.DeepSeq (($!!))
 import Network.HTTP.Conduit
 import Network.HTTP.Client.TLS (getGlobalManager)
-import Data.Conduit (($$+-), (=$))
+import Data.Conduit ((.|), runConduit)
 import Data.Conduit.Binary (sinkFile)
 import Data.Conduit.Zlib (ungzip)
 import System.IO (hPutStrLn, stderr, hFlush)
@@ -74,7 +74,7 @@ loadData update' = do
             runResourceT $ do
                 res <- http req m
                 liftIO $ log "Received response headers"
-                responseBody res $$+- ungzip =$ sinkFile "tmp"
+                runConduit $ responseBody res .| ungzip .| sinkFile "tmp"
             log "Finished writing"
             !newest <- fmap (newestFromIds . newestToIds) $ loadNewestFrom "tmp"
             log "Finished parsing"

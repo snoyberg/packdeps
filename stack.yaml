@@ -1,10 +1,16 @@
-resolver: lts-6.30
+resolver: lts-11.0
 packages:
 - packdeps-cli
 - packdeps-yesod
 extra-deps:
-- optparse-applicative-0.14.0.0
-- Cabal-2.0.0.2
+- Cabal-2.2.0.0@rev:1
+- http-api-data-0.3.8@rev:0
+- entropy-0.4.1.1@rev:0
+- happy-1.19.9@rev:2
+
+# Workaround for https://github.com/commercialhaskell/stack/issues/3922
+- haskell-src-exts-1.20.2@rev:0
+- language-javascript-0.6.0.10@rev:0
 image:
   container:
     name: snoyberg/packdeps

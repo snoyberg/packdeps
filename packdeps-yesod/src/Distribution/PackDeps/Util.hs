@@ -35,56 +35,36 @@ foldVersionRange anyv this later earlier union' intersect' = fold'
     fold' (UnionVersionRanges v1 v2)     = union' (fold' v1) (fold' v2)
     fold' (IntersectVersionRanges v1 v2) = intersect' (fold' v1) (fold' v2)
     fold' (VersionRangeParens v)         = fold' v
+    fold' (MajorBoundVersion v)          = fold' (majorBound v)
+    fold' (OrLaterVersion v)             = fold' (orLaterVersion v)
+    fold' (OrEarlierVersion v)           = fold' (orEarlierVersion v)
 
     wildcard v = IntersectVersionRanges
                    (orLaterVersion v)
                    (EarlierVersion (wildcardUpperBound v))
 
-
-foldVersionRange' :: a                         -- ^ @\"-any\"@ version
-                  -> (Version -> a)            -- ^ @\"== v\"@
-                  -> (Version -> a)            -- ^ @\"> v\"@
-                  -> (Version -> a)            -- ^ @\"< v\"@
-                  -> (Version -> a)            -- ^ @\">= v\"@
-                  -> (Version -> a)            -- ^ @\"<= v\"@
-                  -> (Version -> Version -> a) -- ^ @\"== v.*\"@ wildcard. The
-                                               -- function is passed the
-                                               -- inclusive lower bound and the
-                                               -- exclusive upper bounds of the
-                                               -- range defined by the wildcard.
-                  -> (a -> a -> a)             -- ^ @\"_ || _\"@ union
-                  -> (a -> a -> a)             -- ^ @\"_ && _\"@ intersection
-                  -> (a -> a)                  -- ^ @\"(_)\"@ parentheses
-                  -> VersionRange Version -> a
-foldVersionRange' anyv this later earlier orLater orEarlier
-                  wildcard union' intersect' parens = fold'
-  where
-    fold' AnyVersion                     = anyv
-    fold' (ThisVersion v)                = this v
-    fold' (LaterVersion v)               = later v
-    fold' (EarlierVersion v)             = earlier v
-
-    fold' (UnionVersionRanges (ThisVersion    v)
-                             (LaterVersion   v')) | v==v' = orLater v
-    fold' (UnionVersionRanges (LaterVersion   v)
-                             (ThisVersion    v')) | v==v' = orLater v
-    fold' (UnionVersionRanges (ThisVersion    v)
-                             (EarlierVersion v')) | v==v' = orEarlier v
-    fold' (UnionVersionRanges (EarlierVersion v)
-                             (ThisVersion    v')) | v==v' = orEarlier v
-
-    fold' (WildcardVersion v)            = wildcard v (wildcardUpperBound v)
-    fold' (UnionVersionRanges v1 v2)     = union' (fold' v1) (fold' v2)
-    fold' (IntersectVersionRanges v1 v2) = intersect' (fold' v1) (fold' v2)
-    fold' (VersionRangeParens v)         = parens (fold' v)
+    majorBound v = IntersectVersionRanges
+                    (orLaterVersion v)
+                    (EarlierVersion (majorUpperBound v))
 
 wildcardUpperBound :: Version -> Version
 wildcardUpperBound (Version (D.versionNumbers -> lowerBound)) = (Version $ D.mkVersion upperBound)
   where
     upperBound = Prelude.init lowerBound ++ [Prelude.last lowerBound + 1]
 
+majorUpperBound :: Version -> Version
+majorUpperBound (Version (D.versionNumbers -> v)) =
+  Version $ D.mkVersion $
+    case v of
+      [] -> error "majorUpperbound: impossible empty input"
+      [x] -> [x, 1]
+      x:y:_ -> [x, y + 1]
+
 orLaterVersion :: Version -> VersionRange Version
 orLaterVersion   v = UnionVersionRanges (ThisVersion v) (LaterVersion v)
+
+orEarlierVersion :: Version -> VersionRange Version
+orEarlierVersion   v = UnionVersionRanges (ThisVersion v) (EarlierVersion v)
 
 convertVersionRange :: D.VersionRange -> VersionRange Version
 convertVersionRange =
@@ -98,9 +78,9 @@ convertVersionRange =
     goR (D.UnionVersionRanges x y) = UnionVersionRanges (goR x) (goR y)
     goR (D.IntersectVersionRanges x y) = IntersectVersionRanges (goR x) (goR y)
     goR (D.VersionRangeParens x) = VersionRangeParens $ goR x
-    goR (D.MajorBoundVersion x) = -- FIXME figure this out correctly IntersectVersionRanges
-      (orLaterVersion (Version x))
-      -- (EarlierVersion 
+    goR (D.MajorBoundVersion x) = MajorBoundVersion $ convertVersion x
+    goR (D.OrLaterVersion x) = OrLaterVersion $ convertVersion x
+    goR (D.OrEarlierVersion x) = OrEarlierVersion $ convertVersion x
 
 convertVersion :: D.Version -> Version
 convertVersion = Version
