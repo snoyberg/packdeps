@@ -1,3 +1,8 @@
+## 0.4.5
+
+* Switch to Cabal 2.2
+* Add preferred switch
+
 ## 0.4.4
 
 * Switch over to Cabal 2.0. (Normally it would be better to keep
