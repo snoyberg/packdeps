@@ -31,9 +31,10 @@ module Distribution.PackDeps
     ) where
 
 import Control.Applicative as A ((<$>))
+import Control.Monad (guard)
 import System.Directory (getAppUserDataDirectory, doesFileExist)
 import System.FilePath ((</>))
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import Data.List (foldl', group, sort, isInfixOf)
 import Data.Time (UTCTime (UTCTime), addUTCTime)
 import Data.Maybe (mapMaybe, fromMaybe)
@@ -41,15 +42,14 @@ import Control.Exception (throw)
 
 import Distribution.Package
 import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
+import Distribution.PackageDescription.Parsec
+import Distribution.Parsec.Class (Parsec, lexemeParsec, runParsecParser, simpleParsec)
+import Distribution.Parsec.FieldLineStream (fieldLineStreamFromBS)
 import Distribution.Version
-import Distribution.Text
 import qualified Distribution.ParseUtils as PU
 
 import Data.Char (toLower)
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as T
-import qualified Data.Text.Encoding.Error as T
+import qualified Data.ByteString as S
 import qualified Data.ByteString.Lazy as L
 
 import Data.List.Split (splitOn)
@@ -64,8 +64,8 @@ import qualified Data.Set as Set
 import Text.Read (readMaybe)
 -- import Data.Monoid ((<>))
 
-loadNewest :: IO Newest
-loadNewest = do
+loadNewest :: Bool -> IO Newest
+loadNewest preferred = do
     c <- getAppUserDataDirectory "cabal"
     cfg' <- readFile (c </> "config")
     cfg <- parseResult (fail . show) return $ PU.readFields cfg'
@@ -75,55 +75,83 @@ loadNewest = do
             (rrc : _) -> rrc               -- User-specified
         tarNames repo = [ pfx </> "01-index.tar", pfx </> "00-index.tar" ]
           where pfx = repoCache </> repo
-    fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom . tarNames) $ repos
+    fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom preferred . tarNames) $ repos
 
 -- | Takes a list of possible pathes, tries them in order until one exists.
-loadNewestFrom :: [FilePath] -> IO Newest
-loadNewestFrom []         = fail "loadNewestFrom: no index tarball"
-loadNewestFrom (fp : fps) = do
+loadNewestFrom :: Bool -> [FilePath] -> IO Newest
+loadNewestFrom _ []         = fail "loadNewestFrom: no index tarball"
+loadNewestFrom preferred (fp : fps) = do
     e <- doesFileExist fp
     if e
-        then fmap parseNewest (L.readFile fp)
-        else loadNewestFrom fps
+        then fmap (parseNewest preferred) (L.readFile fp)
+        else loadNewestFrom preferred fps
 
-parseNewest :: L.ByteString -> Newest
-parseNewest = foldl' addPackage Map.empty . entriesToList . Tar.read
+parseNewest :: Bool -> L.ByteString -> Newest
+parseNewest preferred lbs =
+    foldl' (addPackage pref) Map.empty . entriesToList . Tar.read $ lbs
+  where
+    pref | preferred = parsePreferred lbs
+         | otherwise = Map.empty
+
+parsePreferred :: L.ByteString -> Preferred
+parsePreferred = foldl' addPreferred Map.empty . entriesToList . Tar.read
 
 entriesToList :: Tar.Entries Tar.FormatError -> [Tar.Entry]
 entriesToList Tar.Done = []
 entriesToList (Tar.Fail s) = throw s
 entriesToList (Tar.Next e es) = e : entriesToList es
 
-addPackage :: Newest -> Tar.Entry -> Newest
-addPackage m entry =
+addPackage :: Preferred -> Newest -> Tar.Entry -> Newest
+addPackage pref m entry =
     case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
-        [package', versionS, _] ->
-            case simpleParse versionS of
-                Just version ->
-                    case Map.lookup package' m of
-                        Nothing -> go package' version
-                        Just PackInfo { piVersion = oldv } ->
-                            -- in 01-index.tar there are entries with the same versions
-                            if version >= oldv
-                                then go package' version
-                                else m
-                Nothing -> m
-        _ -> m
+        [packageS, versionS, _] -> fromMaybe m $ do
+            package' <- simpleParsec packageS
+            version <- simpleParsec versionS
+
+            -- if there are preferred versions, consider only them
+            guard (maybe True (withinRange version) $ Map.lookup package' pref)
+
+            case Map.lookup package' m of
+                Nothing -> return $ go package' version
+                Just PackInfo { piVersion = oldv } -> do
+                    -- in 01-index.tar there are entries with the same versions
+                    guard (version >= oldv)
+                    return $ go package' version
+        _ -> m -- error (show entry)
   where
     go package' version =
         case Tar.entryContent entry of
-            Tar.NormalFile bs _ ->
-                Map.insertWith maxVersion package' PackInfo
+            Tar.NormalFile lbs _ ->
+                let bs = S.copy (L.toStrict lbs)
+                in bs `seq` Map.insertWith maxVersion package' PackInfo
                         { piVersion = version
                         , piDesc = parsePackage bs
                         , piEpoch = Tar.entryTime entry
                         } m
             _ -> m
 
+addPreferred :: Preferred -> Tar.Entry -> Preferred
+addPreferred m entry =
+    case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
+        [_packageS, "preferred-versions"] ->
+            case Tar.entryContent entry of
+                Tar.NormalFile bs _ -> case simpleParsecLBS bs of
+                    Just (Dependency dep range) -> Map.insert dep range m
+                    Nothing -> m
+                _ -> m
+        _ -> m
+
+simpleParsecLBS :: Parsec a => L.ByteString -> Maybe a
+simpleParsecLBS = either (const Nothing) Just
+    . runParsecParser lexemeParsec "<simpleParsec>"
+    . fieldLineStreamFromBS
+    . S.copy
+    . L.toStrict
+
 data PackInfo = PackInfo
-    { piVersion  :: Version
-    , piDesc     :: Maybe DescInfo
-    , piEpoch    :: Tar.EpochTime
+    { piVersion  :: !Version
+    , piDesc     :: Maybe DescInfo -- this is deliberately lazy
+    , piEpoch    :: !Tar.EpochTime
     }
     deriving (Show, Read)
 
@@ -140,9 +168,12 @@ maxVersion :: PackInfo -> PackInfo -> PackInfo
 maxVersion pi1 pi2 = if piVersion pi1 <= piVersion pi2 then pi2 else pi1
 
 -- | The newest version of every package.
-type Newest = Map.Map String PackInfo
+type Newest = Map.Map PackageName PackInfo
 
-type Reverses = Map.Map String (Version, [(String, VersionRange)])
+-- | The preferred versions of every package
+type Preferred = Map.Map PackageName VersionRange
+
+type Reverses = Map.Map PackageName (Version, [(PackageName, VersionRange)])
 
 getReverses :: Newest -> Reverses
 getReverses newest =
@@ -152,7 +183,7 @@ getReverses newest =
     toTuples (_, PackInfo { piDesc = Nothing }) = []
     toTuples (rel, PackInfo { piDesc = Just DescInfo { diDeps = deps } }) =
         map (toTuple rel) deps
-    toTuple rel (Dependency (unPackageName -> dep) range) = (dep, (rel, range))
+    toTuple rel (Dependency dep range) = (dep, (rel, range))
     hoist :: Ord a => [(a, b)] -> [(a, [b])]
     hoist = map ((fst . head) &&& map snd)
           . groupBy ((==) `on` fst)
@@ -225,38 +256,37 @@ checkDepsImpl deps newest desc =
 -- dependencies. If not, it returns a list of packages which are not accepted,
 -- and a timestamp of the most recently updated package.
 data CheckDepsRes = AllNewest
-                  | WontAccept [(String, String)] UTCTime
+                  | WontAccept [(PackageName, Version)] UTCTime
     deriving Show
 
 epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
-notNewest :: Newest -> Dependency -> Maybe ((String, String), Tar.EpochTime)
-notNewest newest (Dependency (unPackageName -> s) range) =
+notNewest :: Newest -> Dependency -> Maybe ((PackageName, Version), Tar.EpochTime)
+notNewest newest (Dependency s range) =
     case Map.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
         Just PackInfo { piVersion = version, piEpoch = e } ->
             if withinRange version range
                 then Nothing
-                else Just ((s, display version), e)
+                else Just ((s, version), e)
 
 -- | Loads up the newest version of a package from the 'Newest' list, if
 -- available.
-getPackage :: String -> Newest -> Maybe DescInfo
+getPackage :: PackageName -> Newest -> Maybe DescInfo
 getPackage s n = Map.lookup s n >>= piDesc
 
 -- | Parse information on a package from the contents of a cabal file.
-parsePackage :: L.ByteString -> Maybe DescInfo
-parsePackage lbs =
-    case parseGenericPackageDescription $ T.unpack
-       $ T.decodeUtf8With T.lenientDecode lbs of
-        ParseOk _ x -> Just $ getDescInfo x
-        _ -> Nothing
+parsePackage :: S.ByteString -> Maybe DescInfo
+parsePackage bs =
+    case snd $ runParseResult $ parseGenericPackageDescription bs of
+        Right x -> Just $ getDescInfo x
+        Left _  -> Nothing
 
 -- | Load a single package from a cabal file.
 loadPackage :: FilePath -> IO (Maybe DescInfo)
-loadPackage = fmap parsePackage . L.readFile
+loadPackage = fmap parsePackage . S.readFile
 
 -- | Find all of the packages matching a given search string.
 filterPackages :: String -> Newest -> [DescInfo]
@@ -293,7 +323,7 @@ deepDepsImpl deps newest dis0 =
         newDis = mapMaybe getDI $ deps di
         getDI :: Dependency -> Maybe DescInfo
         getDI (Dependency name' _) = do
-            pi' <- Map.lookup (unPackageName name') newest
+            pi' <- Map.lookup name' newest
             piDesc pi'
 
 diName :: DescInfo -> String
@@ -324,6 +354,6 @@ lookupInConfig key = mapMaybe f
     f _ = Nothing
 
 -- | Like 'either', but for 'ParseResult'
-parseResult :: (PU.PError -> r) -> (a -> r) -> ParseResult a -> r
+parseResult :: (PU.PError -> r) -> (a -> r) -> PU.ParseResult a -> r
 parseResult l _ (PU.ParseFailed e)    = l e
 parseResult _ r (PU.ParseOk _warns x) = r x
