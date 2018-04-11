@@ -45,6 +45,7 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
 import Distribution.Parsec.Class (Parsec, lexemeParsec, runParsecParser, simpleParsec)
 import Distribution.Parsec.FieldLineStream (fieldLineStreamFromBS)
+import Distribution.Types.CondTree
 import Distribution.Version
 import qualified Distribution.ParseUtils as PU
 
@@ -225,13 +226,31 @@ getDescInfo gpd = DescInfo
 
 getDeps :: GenericPackageDescription -> [Dependency]
 getDeps x = getLibDeps x ++ concat
-    [ concatMap (condTreeConstraints . snd) (condExecutables x)
-    , concatMap (condTreeConstraints . snd) (condTestSuites x)
-    , concatMap (condTreeConstraints . snd) (condBenchmarks x)
+    [ concatMap (condTreeConstraints' . snd) (condExecutables x)
+    , concatMap (condTreeConstraints' . snd) (condTestSuites x)
+    , concatMap (condTreeConstraints' . snd) (condBenchmarks x)
     ]
 
 getLibDeps :: GenericPackageDescription -> [Dependency]
-getLibDeps gpd = maybe [] condTreeConstraints (condLibrary gpd)
+getLibDeps gpd = maybe [] condTreeConstraints' (condLibrary gpd)
+
+condTreeConstraints' :: Monoid c => CondTree ConfVar c a  -> c
+condTreeConstraints' = go where
+    go (CondNode _ c bs) = mappend c (foldMap branch bs)
+
+    branch (CondBranch c' x y)
+        | notFlagCondition c' = mappend (go x) (foldMap go y)
+        | otherwise           = mempty
+
+notFlagCondition :: Condition ConfVar -> Bool
+notFlagCondition (Var (OS _))     = True
+notFlagCondition (Var (Arch _))   = True
+notFlagCondition (Var (Flag _))   = False
+notFlagCondition (Var (Impl _ _)) = True
+notFlagCondition (Lit _)          = True
+notFlagCondition (CNot a)         = notFlagCondition a
+notFlagCondition (COr a b)        = notFlagCondition a && notFlagCondition b
+notFlagCondition (CAnd a b)       = notFlagCondition a && notFlagCondition b
 
 checkDeps :: Newest -> DescInfo
           -> (PackageName, Version, CheckDepsRes)
