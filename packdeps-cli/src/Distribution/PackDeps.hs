@@ -232,7 +232,16 @@ getDeps x = getLibDeps x ++ concat
     ]
 
 getLibDeps :: GenericPackageDescription -> [Dependency]
-getLibDeps gpd = maybe [] condTreeConstraints' (condLibrary gpd)
+getLibDeps gpd = maybe [] condTreeConstraints' (condLibrary gpd) ++ customDeps
+  where
+    pd = packageDescription gpd
+    customDeps
+        | buildType pd == Custom = maybe defSetupDeps setupDepends (setupBuildInfo pd)
+        | otherwise = []
+
+    -- we only interested in Cabal default upper bound
+    -- See cabal-install Distribution.Client.ProjectPlanning defaultSetupDeps
+    defSetupDeps = [Dependency (mkPackageName "Cabal") $ earlierVersion $ mkVersion [1,25]]
 
 condTreeConstraints' :: Monoid c => CondTree ConfVar c a  -> c
 condTreeConstraints' = go where
