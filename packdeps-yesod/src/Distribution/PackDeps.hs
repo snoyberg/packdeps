@@ -188,7 +188,11 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
             $ foldr (HMap.unionWith mappend) HMap.empty
             $ map (\(Dependency k v, pu) -> HMap.singleton (PackageName k) (PUVersionRange pu v))
             $ mconcat
-                [ maybe mempty (go Runtime) $ condLibrary gpd
+                [ maybe mempty (map (, Runtime) . setupDepends)
+                    $ setupBuildInfo $ packageDescription gpd
+                , maybe mempty (go Runtime) $ condLibrary gpd
+                , mconcat $ map (go Runtime . snd) $ condSubLibraries gpd
+                , mconcat $ map (go Runtime . snd) $ condForeignLibs gpd
                 , mconcat $ map (go Runtime . snd) $ condExecutables gpd
                 , mconcat $ map (go TestBench . snd) $ condTestSuites gpd
                 , mconcat $ map (go TestBench . snd) $ condBenchmarks gpd
