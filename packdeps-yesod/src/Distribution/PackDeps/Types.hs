@@ -260,19 +260,23 @@ data DescInfo name version = DescInfo
 
 data PackageUsage = Runtime | TestBench
     deriving Generic
+instance Semigroup PackageUsage where
+    Runtime <> _ = Runtime
+    TestBench <> x = x
 instance Monoid PackageUsage where
     mempty = TestBench
-    Runtime `mappend` _ = Runtime
-    TestBench `mappend` x = x
+    mappend = (<>)
 
 data PUVersionRange vr = PUVersionRange
     { puvrPU :: !PackageUsage
     , puvrVR :: !vr
     }
     deriving Generic
+instance Semigroup (PUVersionRange D.VersionRange) where
+    PUVersionRange a x <> PUVersionRange b y = PUVersionRange (mappend a b) (D.simplifyVersionRange $ D.IntersectVersionRanges x y)
 instance Monoid (PUVersionRange D.VersionRange) where
     mempty = PUVersionRange mempty D.AnyVersion
-    PUVersionRange a x `mappend` PUVersionRange b y = PUVersionRange (mappend a b) (D.simplifyVersionRange $ D.IntersectVersionRanges x y)
+    mappend = (<>)
 instance Functor PUVersionRange where
     fmap f (PUVersionRange x y) = PUVersionRange x (f y)
 
@@ -347,8 +351,10 @@ newtype License = License { unLicense :: Text }
 newtype Licenses = Licenses { unLicenses :: (Map License (Set PackageName)) }
     deriving (NFData)
 
+instance Semigroup Licenses where
+    Licenses x <> Licenses y = Licenses $ Map.unionWith mappend x y
 instance Monoid Licenses where
     mempty = Licenses mempty
-    Licenses x `mappend` Licenses y = Licenses $ Map.unionWith mappend x y
+    mappend = (<>)
 
 type LicenseMap = Map PackageName Licenses
