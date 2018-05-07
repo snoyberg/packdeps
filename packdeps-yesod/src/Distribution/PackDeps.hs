@@ -113,7 +113,7 @@ addPackage (Newest m, count) entry = do
   where
     (m', count') =
       case splitOn "/" $ Tar.fromTarPathToPosixPath (Tar.entryTarPath entry) of
-        [package', versionS, _] ->
+        [package', versionS, name] | ".cabal" `TS.isSuffixOf` TS.pack name ->
             let package'' = PackageName $ D.mkPackageName package'
              in case fmap convertVersion $ simpleParse versionS of
                     _ | package' == "acme-everything" -> (m, count) -- takes too long to parse
@@ -121,7 +121,7 @@ addPackage (Newest m, count) entry = do
                         case HMap.lookup package'' m of
                             Nothing -> go package'' version
                             Just PackInfo { piVersion = oldv } ->
-                                if version > oldv
+                                if version >= oldv
                                     then go package'' version
                                     else (m, count)
                     Nothing -> (m, count)

@@ -61,7 +61,7 @@ loadData update' = do
             hPutStrLn stderr $ concat [show now, ": ", s]
             hFlush stderr
     log "Entered loadData"
-    req' <- parseUrlThrow "http://hackage.haskell.org/packages/archive/00-index.tar.gz"
+    req' <- parseUrlThrow "http://hackage.haskell.org/01-index.tar.gz"
 #if MIN_VERSION_http_client(0,5,0)
     let req = req' { responseTimeout = responseTimeoutMicro 30000000 }
 #else
