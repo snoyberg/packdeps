@@ -5,12 +5,15 @@
         <th>Package
         <th>Total Dependencies
         <th>Total Outdated Dependencies
+        <th .synopsis>Synopsis
     $forall p <- sortByName $ H.toList reverse'
         <tr>
             <td>
                 <a href=@{ReverseR $ unPackageName $ fst p}>#{unPackageName $ fst p}
             <td>#{show $ H.size $ snd $ snd p}
-            $maybe o <- getOutdated $ snd p
-                <td style="color:#900">#{o}
-            $nothing
-                <td>0
+            <td>#{show $ snd p}
+$#            $maybe o <- getOutdated $ snd p
+$#                <td style="color:#900">#{o}
+$#            $nothing
+$#                <td>0
+            <td .synopsis>#{snd $ fst $ snd p}

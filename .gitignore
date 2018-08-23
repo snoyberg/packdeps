@@ -8,3 +8,5 @@ static/tmp/
 yesod-devel/
 .stack-work/
 /tarballs/
+packdeps-yesod/static/tmp
+packdeps-yesod/tmp

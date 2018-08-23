@@ -36,3 +36,7 @@ form p {
     margin-top: 1em;
     text-align: center
 }
+
+.synopsis {
+  white-space: nowrap;
+}
