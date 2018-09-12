@@ -1,6 +1,9 @@
 <h1>
     <a href="http://hackage.haskell.org/package/#{dep}">#{dep}
-    \ #{show version}<br />#{syn}
+    \ #{show version}
+#{syn}
+<br />
+<br />
 <div #control>
     <input #only-out-of-date type=checkbox>
     <label for=only-out-of-date>Only display out-of-date packages.

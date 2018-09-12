@@ -174,6 +174,8 @@ getReverses (Newest newest) =
             Nothing -> Nothing
             Just PackInfo { piVersion = v, piDesc = Just' DescInfo { diSynopsis = syn } }
               -> Just (dep, ((v, syn), rels))
+            Just PackInfo { piVersion = v, piDesc = Nothing' }
+              -> Just (dep, ((v, "n/a"), rels))
 
 getDescInfo :: GenericPackageDescription -> (DescInfo PackageName Version, License)
 getDescInfo gpd = (DescInfo

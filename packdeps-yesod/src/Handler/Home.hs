@@ -146,9 +146,9 @@ getReverseListR = do
         toWidget $(luciusFile "templates/home.lucius")
         $(widgetFile "reverselist")
   where
-    getOutdated :: ((Version, b), HashMap a (VersionRange Version)) -> Maybe String
+    getOutdated :: ((Version, b), HashMap a (VersionRange Version, Text)) -> Maybe String
     getOutdated ((version, _), pairs) =
-        case filter (not . withinRange version . snd) $ H.toList pairs of
+        case filter (not . withinRange version . fst . snd) $ H.toList pairs of
             [] -> Nothing
             ps -> Just $ show $ length ps
 
