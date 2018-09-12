@@ -12,3 +12,6 @@ tr.out-of-date td.version {
 #control {
     display: none;
 }
+.synopsis {
+  white-space: nowrap;
+}

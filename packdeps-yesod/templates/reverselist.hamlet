@@ -5,6 +5,7 @@
         <th>Package
         <th>Total Dependencies
         <th>Total Outdated Dependencies
+        <th .synopsis>Synopsis
     $forall p <- sortByName $ H.toList reverse'
         <tr>
             <td>
@@ -14,3 +15,9 @@
                 <td style="color:#900">#{o}
             $nothing
                 <td>0
+            <td .synopsis>
+                $with syn <- snd $ fst $ snd p
+                    $if (T.length syn) > 58
+                        #{T.append (T.take 58 syn) ".."}
+                    $else
+                        #{syn}

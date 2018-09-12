@@ -150,7 +150,8 @@ getReverses (Newest newest) =
     HMap.fromList withVersion
   where
     -- dep = dependency, rel = relying package
-    --toTuples :: (PackageName, PackInfo) -> HMap.HashMap PackageName (HMap.HashMap PackageName VersionRange)
+    toTuples :: (PackageName, PackInfo PackageName version license)
+             -> HMap.HashMap PackageName (HMap.HashMap PackageName (VersionRange version, Text))
     toTuples (_, PackInfo { piDesc = Nothing' }) = HMap.empty
     toTuples (rel, PackInfo { piDesc = Just' desc@DescInfo { diDeps = deps } })
         | isDeprecated desc = HMap.empty
@@ -158,20 +159,23 @@ getReverses (Newest newest) =
 
     combine = unionsWith HMap.union
 
-    toTuple rel (dep, PUVersionRange _ range) =
+    toTuple rel (dep, ((PUVersionRange _ range), syn)) =
         if rel == dep
             then HMap.empty
-            else HMap.singleton dep $ HMap.singleton rel range
+            else HMap.singleton dep $ HMap.singleton rel (range, syn)
 
-    hoisted :: HMap.HashMap PackageName (HMap.HashMap PackageName (VersionRange Version))
+    hoisted :: HMap.HashMap PackageName (HMap.HashMap PackageName (VersionRange Version, Text))
     hoisted = combine $ map toTuples $ HMap.toList newest
 
-    withVersion = mapMaybe addVersion $ HMap.toList hoisted
+    withVersion = mapMaybe addExtraInfo $ HMap.toList hoisted
 
-    addVersion (dep, rels) =
+    addExtraInfo (dep, rels) =
         case HMap.lookup dep newest of
             Nothing -> Nothing
-            Just PackInfo { piVersion = v} -> Just (dep, (v, rels))
+            Just PackInfo { piVersion = v, piDesc = Just' DescInfo { diSynopsis = syn } }
+              -> Just (dep, ((v, syn), rels))
+            Just PackInfo { piVersion = v, piDesc = Nothing' }
+              -> Just (dep, ((v, "n/a"), rels))
 
 getDescInfo :: GenericPackageDescription -> (DescInfo PackageName Version, License)
 getDescInfo gpd = (DescInfo
@@ -183,8 +187,9 @@ getDescInfo gpd = (DescInfo
     p = packageDescription gpd
     PackageIdentifier (D.unPackageName -> name) _version = package p
 
-getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange (VersionRange Version))
-getDeps gpd = HMap.map (fmap convertVersionRange)
+getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange (VersionRange Version), Text)
+getDeps gpd = HMap.map (\val -> (val, pack $ synopsis $ packageDescription gpd))
+            $ HMap.map (fmap convertVersionRange)
             $ foldr (HMap.unionWith mappend) HMap.empty
             $ map (\(Dependency k v, pu) -> HMap.singleton (PackageName k) (PUVersionRange pu v))
             $ mconcat
@@ -279,9 +284,9 @@ epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
 notNewest :: Newest
-          -> (PackageName, PUVersionRange (VersionRange Version))
+          -> (PackageName, (PUVersionRange (VersionRange Version), Text))
           -> Maybe ((PackageName, Outdated), Tar.EpochTime)
-notNewest (Newest newest) (s, PUVersionRange _ range) =
+notNewest (Newest newest) (s, (PUVersionRange _ range, _)) =
     case HMap.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
@@ -397,5 +402,5 @@ getLicenseMap includeTests (Newest newest) =
                         lmsResult %= Map.insert p ls
                         return ls
 
-    isIncluded (_, PUVersionRange Runtime _) = True
-    isIncluded (_, PUVersionRange TestBench _) = includeTests
+    isIncluded (_, (PUVersionRange Runtime _, _)) = True
+    isIncluded (_, (PUVersionRange TestBench _, _)) = includeTests

@@ -19,7 +19,7 @@ import Distribution.PackDeps.Util (withinRange)
 import Control.Arrow ((&&&))
 import Data.List (sortBy)
 import Data.Ord (comparing)
-import Distribution.PackDeps.Types (Version, PackageName, unPackageName, mkPackageName)
+import Distribution.PackDeps.Types (Version, PackageName, unPackageName, mkPackageName, VersionRange)
 import Yesod.Form.Jquery (urlJqueryJs)
 
 getHomeR :: Handler Html
@@ -146,15 +146,16 @@ getReverseListR = do
         toWidget $(luciusFile "templates/home.lucius")
         $(widgetFile "reverselist")
   where
-    getOutdated (version, pairs) =
-        case filter (not . withinRange version . snd) $ H.toList pairs of
+    getOutdated :: ((Version, b), HashMap a (VersionRange Version, Text)) -> Maybe String
+    getOutdated ((version, _), pairs) =
+        case filter (not . withinRange version . fst . snd) $ H.toList pairs of
             [] -> Nothing
             ps -> Just $ show $ length ps
 
 getReverseR :: Text -> Handler Html
 getReverseR dep = do
     (_, reverse') <- getData
-    (version, rels) <- maybe notFound return $ H.lookup (mkPackageName dep) reverse'
+    ((version, syn), rels) <- maybe notFound return $ H.lookup (mkPackageName dep) reverse'
     y <- getYesod
     defaultLayout $ do
         setTitle [shamlet|Reverse dependencies for #{dep}|]

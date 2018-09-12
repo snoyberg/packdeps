@@ -177,7 +177,8 @@ newestToIds (Newest newest) =
         deps <- mapFromList <$> mapM goDep (mapToList $ diDeps di)
         return di { diDeps = deps }
 
-    goDep (name, PUVersionRange pu vrange) = (,) <$> getName name <*> (PUVersionRange pu <$> goVR vrange)
+    goDep (name, (PUVersionRange pu vrange, syn)) = let f vr_thing = (PUVersionRange pu vr_thing, syn)
+                                                     in (,) <$> getName name <*> (fmap f $ goVR vrange)
 
     goVR AnyVersion = return AnyVersion
     goVR (ThisVersion v) = ThisVersion <$> getVersion v
@@ -198,19 +199,22 @@ newestFromIds (NewestIds nameV versionV licenseV pairs) =
     getName (NameId nid) = nameV ! fromIntegral nid
     getVersion (VersionId vid) = versionV ! fromIntegral vid
     getLicense (LicenseId lid) = licenseV ! fromIntegral lid
+    goPair :: (NameId, PackInfo NameId VersionId LicenseId) -> (PackageName, PackInfo PackageName Version License)
     goPair (nid, p) = (getName nid, goPI p)
 
+    goPI :: PackInfo NameId VersionId LicenseId -> PackInfo PackageName Version License
     goPI pi = pi
         { piVersion = getVersion $ piVersion pi
         , piDesc = fmap goDI $ piDesc pi
         , piLicense = getLicense $ piLicense pi
         }
 
-    goDI di = di
-        { diDeps = mapFromList $ map goPair' $ mapToList $ diDeps di
-        }
+    goDI :: DescInfo NameId VersionId -> DescInfo PackageName Version
+    goDI di = di { diDeps = mapFromList $ map goPair' $ mapToList $ diDeps di }
 
-    goPair' (nid, PUVersionRange pu vr) = (getName nid, PUVersionRange pu $ goVR vr)
+    goPair' :: (NameId, (PUVersionRange (VersionRange VersionId), Text))
+            -> (PackageName, (PUVersionRange (VersionRange Version), Text))
+    goPair' (nid, (PUVersionRange pu vr, syn)) = (getName nid, (PUVersionRange pu $ goVR vr, syn))
 
     goVR AnyVersion = AnyVersion
     goVR (ThisVersion v) = ThisVersion $ getVersion v
@@ -231,7 +235,7 @@ instance Binary Newest where
 -- | The newest version of every package.
 newtype Newest = Newest { unNewest :: HashMap PackageName (PackInfo PackageName Version License) }
 
-type Reverses = HashMap PackageName (Version, HashMap PackageName (VersionRange Version))
+type Reverses = HashMap PackageName ((Version, Text), HashMap PackageName (VersionRange Version, Text))
 
 data PackInfo name version license = PackInfo
     { piVersion :: !version
@@ -253,7 +257,7 @@ maybe' _ f (Just' a) = f a
 -- | Information on a single package.
 data DescInfo name version = DescInfo
     { diHaystack :: !Text
-    , diDeps :: !(HashMap name (PUVersionRange (VersionRange version)))
+    , diDeps :: !(HashMap name (PUVersionRange (VersionRange version), Text))
     , diSynopsis :: !Text
     }
     deriving Generic
