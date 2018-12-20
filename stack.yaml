@@ -1,4 +1,4 @@
-resolver: nightly-2018-04-16
+resolver: nightly-2018-12-19
 packages:
 - packdeps-cli
 - packdeps-yesod

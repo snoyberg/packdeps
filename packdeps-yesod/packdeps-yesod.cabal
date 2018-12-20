@@ -75,7 +75,7 @@ library
                  , http-client-tls
                  , conduit                       >= 0.5
                  , time
-                 , Cabal                         >= 2.2 && < 2.3
+                 , Cabal                         >= 2.4 && < 2.5
                  , containers
                  , deepseq
                  , tar
