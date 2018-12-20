@@ -48,10 +48,10 @@ import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
 
 import Distribution.Package hiding (PackageName)
-import Distribution.License (licenseFromSPDX)
 import qualified Distribution.Package as D
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
+import Distribution.Pretty (prettyShow)
 import Distribution.Types.CondTree (CondBranch (..))
 import qualified Distribution.Version as D
 import Distribution.Text hiding (Text)
@@ -178,7 +178,7 @@ getDescInfo gpd = (DescInfo
     { diHaystack = toCaseFold $ pack $ unlines [author p, maintainer p, name]
     , diDeps = getDeps gpd
     , diSynopsis = pack $ synopsis p
-    }, License $ pack $ display $ licenseFromSPDX $ license $ packageDescription gpd)
+    }, License $ pack $ prettyShow $ license $ packageDescription gpd)
   where
     p = packageDescription gpd
     PackageIdentifier (D.unPackageName -> name) _version = package p
