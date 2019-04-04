@@ -63,12 +63,15 @@ import Data.List (groupBy, sortBy)
 import Data.Ord (comparing)
 import qualified Data.Set as Set
 import Text.Read (readMaybe)
+import System.Environment (lookupEnv)
 -- import Data.Monoid ((<>))
 
 loadNewest :: Bool -> IO Newest
 loadNewest preferred = do
     c <- getAppUserDataDirectory "cabal"
-    cfg' <- readFile (c </> "config")
+    location <- fmap (fromMaybe (c </> "config")) (lookupEnv "CABAL_CONFIG")
+
+    cfg' <- readFile location
     cfg <- parseResult (fail . show) return $ PU.readFields cfg'
     let repos        = reposFromConfig cfg
         repoCache    = case lookupInConfig "remote-repo-cache" cfg of
