@@ -2,14 +2,14 @@
 import Control.Applicative (many, some)
 import Control.Monad (forM_, foldM, when)
 import Control.Monad (liftM)
+import Data.Char (isSpace)
 import Data.List (foldl')
-import Data.Maybe (mapMaybe)
 import Data.Semigroup ((<>))
-import Distribution.Compat.ReadP (readP_to_S)
 import Distribution.PackDeps
-import Distribution.Package (PackageIdentifier (PackageIdentifier), PackageName, unPackageName)
-import Distribution.Text (display, parse)
+import Distribution.Package (PackageIdentifier (pkgName, pkgVersion), PackageName, unPackageName)
+import Distribution.Text (display)
 import Distribution.Version (Version)
+import qualified Distribution.InstalledPackageInfo as IPI
 import System.Exit (exitFailure, exitSuccess)
 import System.Process (readProcess)
 
@@ -75,19 +75,35 @@ checkDepsCli quiet excludes cd newest di =
 -- TODO
 updateWithGhcPkg :: Newest -> IO Newest
 updateWithGhcPkg newest = do
-    output <- readProcess "ghc-pkg" ["list", "--simple-output"] ""
-    let pkgs = mapMaybe parseSimplePackInfo (words output)
-    return $ foldl' apply newest pkgs
+    output <- readProcess "ghc-pkg" ["dump"] ""
+    ipis <- either (fail . show) (return . map snd) $
+        traverse IPI.parseInstalledPackageInfo $ splitPkgs output
+    return $ foldl' apply newest $ map toPackInfo ipis
   where
     apply :: Newest -> (PackageName, PackInfo) -> Newest
     apply m (k, v) = Map.insert k v m
 
-    parseSimplePackInfo :: String -> Maybe (PackageName, PackInfo)
-    parseSimplePackInfo str =
-        case filter ((== "") . snd) $ readP_to_S parse str of
-            ((PackageIdentifier name ver, _) : _) ->
-                Just (name, PackInfo ver Nothing 0)
-            _ -> Nothing
+    toPackInfo :: IPI.InstalledPackageInfo -> (PackageName, PackInfo)
+    toPackInfo ipi = (pkgName $ IPI.sourcePackageId ipi, pinfo) where
+        pinfo = PackInfo
+            { piVersion = pkgVersion $ IPI.sourcePackageId ipi
+            , piEpoch   = 0
+            , piDesc    = Nothing
+            }
+
+    -- copied from from Cabal
+    splitPkgs :: String -> [String]
+    splitPkgs = checkEmpty . map unlines . splitWith ("---" ==) . lines
+      where
+        -- Handle the case of there being no packages at all.
+        checkEmpty [s] | all isSpace s = []
+        checkEmpty ss                  = ss
+
+        splitWith :: (a -> Bool) -> [a] -> [[a]]
+        splitWith p xs = ys : case zs of
+                           []   -> []
+                           _:ws -> splitWith p ws
+          where (ys,zs) = break p xs
 
 run :: Bool        -- ^ Check transitive dependencies
     -> Bool        -- ^ Quiet -- only report packages that are not up to date
