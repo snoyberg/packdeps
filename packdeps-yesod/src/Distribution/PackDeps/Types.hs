@@ -8,6 +8,7 @@ import GHC.Generics
 import Distribution.Text (display)
 import qualified Distribution.Types.PackageName as D
 import qualified Distribution.Version as D
+import qualified Distribution.Types.VersionRange.Internal as D
 import Data.Vector ((!))
 
 import Data.Binary (Binary (..), putWord8, getWord8, Put, Get)

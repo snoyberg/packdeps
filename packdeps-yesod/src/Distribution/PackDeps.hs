@@ -186,7 +186,7 @@ getDescInfo gpd = (DescInfo
 getDeps :: GenericPackageDescription -> HMap.HashMap PackageName (PUVersionRange (VersionRange Version))
 getDeps gpd = HMap.map (fmap convertVersionRange)
             $ foldr (HMap.unionWith mappend) HMap.empty
-            $ map (\(Dependency k v, pu) -> HMap.singleton (PackageName k) (PUVersionRange pu v))
+            $ map (\(Dependency k v _, pu) -> HMap.singleton (PackageName k) (PUVersionRange pu v))
             $ mconcat
                 [ maybe mempty (map (, Runtime) . setupDepends)
                     $ setupBuildInfo $ packageDescription gpd
@@ -227,7 +227,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
         Just newbase = simpleParse "4.10.0.0"
 
         ok :: Dependency -> Bool
-        ok (Dependency (D.unPackageName -> "base") range) = newbase `D.withinRange` range
+        ok (Dependency (D.unPackageName -> "base") range _) = newbase `D.withinRange` range
         ok _ = True
 
     go' flagMap tree

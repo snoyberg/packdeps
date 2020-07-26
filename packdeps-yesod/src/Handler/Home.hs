@@ -81,6 +81,7 @@ feed2Helper needle deps = do
             <td>#{show $ snd d}
 |]
         , feedEntryEnclosure = Nothing
+        , feedEntryCategories = []
         }
 
 getFeed3R :: Text -> Text -> Text -> Text -> Handler ()
@@ -136,6 +137,7 @@ getSpecificFeedR packages' = do
             <td>#{show $ snd d}
 |]
         , feedEntryEnclosure = Nothing
+        , feedEntryCategories = []
         }
 
 getReverseListR :: Handler Html

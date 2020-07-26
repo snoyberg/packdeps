@@ -5,6 +5,7 @@ module Distribution.PackDeps.Util where
 import ClassyPrelude.Conduit
 import Distribution.PackDeps.Types
 import qualified Distribution.Version as D
+import qualified Distribution.Types.VersionRange.Internal as D
 import qualified Prelude
 
 withinRange :: Version -> VersionRange Version -> Bool
