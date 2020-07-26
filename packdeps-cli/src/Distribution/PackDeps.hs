@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Distribution.PackDeps
     ( -- * Data types
       Newest
@@ -43,11 +44,13 @@ import Control.Exception (throw)
 import Distribution.Package
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
-import Distribution.Parsec.Class (Parsec, lexemeParsec, runParsecParser, simpleParsec)
+import Distribution.Parsec (Parsec, lexemeParsec, runParsecParser, simpleParsec)
 import Distribution.Parsec.FieldLineStream (fieldLineStreamFromBS)
 import Distribution.Types.CondTree
 import Distribution.Version
-import qualified Distribution.ParseUtils as PU
+import qualified Distribution.Fields as F
+import qualified Distribution.Fields.Field as F
+import qualified Distribution.Simple.Utils as U
 
 import Data.Char (toLower)
 import qualified Data.ByteString as S
@@ -71,8 +74,8 @@ loadNewest preferred = do
     c <- getAppUserDataDirectory "cabal"
     location <- fmap (fromMaybe (c </> "config")) (lookupEnv "CABAL_CONFIG")
 
-    cfg' <- readFile location
-    cfg <- parseResult (fail . show) return $ PU.readFields cfg'
+    cfg' <- S.readFile location
+    cfg <- either (fail . show) return $ F.readFields cfg'
     let repos        = reposFromConfig cfg
         repoCache    = case lookupInConfig "remote-repo-cache" cfg of
             []        -> c </> "packages"  -- Default
@@ -140,7 +143,7 @@ addPreferred m entry =
         [_packageS, "preferred-versions"] ->
             case Tar.entryContent entry of
                 Tar.NormalFile bs _ -> case simpleParsecLBS bs of
-                    Just (Dependency dep range) -> Map.insert dep range m
+                    Just (Dependency dep range _) -> Map.insert dep range m
                     Nothing -> m
                 _ -> m
         _ -> m
@@ -187,7 +190,7 @@ getReverses newest =
     toTuples (_, PackInfo { piDesc = Nothing }) = []
     toTuples (rel, PackInfo { piDesc = Just DescInfo { diDeps = deps } }) =
         map (toTuple rel) deps
-    toTuple rel (Dependency dep range) = (dep, (rel, range))
+    toTuple rel (Dependency dep range _) = (dep, (rel, range))
     hoist :: Ord a => [(a, b)] -> [(a, [b])]
     hoist = map ((fst . head) &&& map snd)
           . groupBy ((==) `on` fst)
@@ -244,7 +247,7 @@ getLibDeps gpd = maybe [] condTreeConstraints' (condLibrary gpd) ++ customDeps
 
     -- we only interested in Cabal default upper bound
     -- See cabal-install Distribution.Client.ProjectPlanning defaultSetupDeps
-    defSetupDeps = [Dependency (mkPackageName "Cabal") $ earlierVersion $ mkVersion [1,25]]
+    defSetupDeps = [Dependency (mkPackageName "Cabal") (earlierVersion $ mkVersion [1,25]) mempty]
 
 condTreeConstraints' :: Monoid c => CondTree ConfVar c a  -> c
 condTreeConstraints' = go where
@@ -294,7 +297,7 @@ epochToTime :: Tar.EpochTime -> UTCTime
 epochToTime e = addUTCTime (fromIntegral e) $ UTCTime (read "1970-01-01") 0
 
 notNewest :: Newest -> Dependency -> Maybe ((PackageName, Version), Tar.EpochTime)
-notNewest newest (Dependency s range) =
+notNewest newest (Dependency s range _public) =
     case Map.lookup s newest of
         --Nothing -> Just ((s, " no version found"), 0)
         Nothing -> Nothing
@@ -353,7 +356,7 @@ deepDepsImpl deps newest dis0 =
         viewed' = Set.insert name viewed
         newDis = mapMaybe getDI $ deps di
         getDI :: Dependency -> Maybe DescInfo
-        getDI (Dependency name' _) = do
+        getDI (Dependency name' _ _) = do
             pi' <- Map.lookup name' newest
             piDesc pi'
 
@@ -364,27 +367,29 @@ diName = unPackageName . pkgName . diPackage
 -- ~/.cabal/config parsing
 -------------------------------------------------------------------------------
 
-reposFromConfig :: [PU.Field] -> [String]
+reposFromConfig :: [F.Field ann] -> [String]
 reposFromConfig fields = takeWhile (/= ':') A.<$> mapMaybe f fields
   where
-    f (PU.F _lineNo name value)
+    f (F.Field (F.Name _pos name) fls)
         | name == "remote-repo"
-        = Just value
-    f (PU.Section _lineNo secName arg _fields)
+        = Just $ U.fromUTF8BS $ S.intercalate "\n" (map F.fieldLineBS fls)
+    f (F.Section (F.Name _pos secName) (F.SecArgName _ arg : _) _fields)
         | secName == "repository"
-        = Just arg
+        = Just $ U.fromUTF8BS arg
     f _ = Nothing
 
 -- | Looks up the given key in the cabal configuration file
-lookupInConfig :: String -> [PU.Field] -> [String]
+lookupInConfig :: S.ByteString -> [F.Field ann] -> [String]
 lookupInConfig key = mapMaybe f
   where
-    f (PU.F _lineNo name value)
+    f (F.Field (F.Name _pos name) fls)
         | name == key
-        = Just value
+        = Just $ U.fromUTF8BS $ S.intercalate "\n" (map F.fieldLineBS fls)
     f _ = Nothing
 
+{-
 -- | Like 'either', but for 'ParseResult'
-parseResult :: (PU.PError -> r) -> (a -> r) -> PU.ParseResult a -> r
-parseResult l _ (PU.ParseFailed e)    = l e
-parseResult _ r (PU.ParseOk _warns x) = r x
+parseResult :: (F.PError -> r) -> (a -> r) -> F.ParseResult a -> r
+parseResult l _ (F.ParseFailed e)    = l e
+parseResult _ r (F.ParseOk _warns x) = r x
+-}
