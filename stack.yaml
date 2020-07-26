@@ -1,11 +1,4 @@
-resolver: nightly-2018-12-19
+resolver: lts-16.6
 packages:
 - packdeps-cli
 - packdeps-yesod
-image:
-  container:
-    name: snoyberg/packdeps
-    base: fpco/stack-run:lts-6.30
-    add:
-      packdeps-yesod/config: /app/config
-      packdeps-yesod/static: /app/static
