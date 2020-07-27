@@ -46,6 +46,7 @@ import Control.Monad ((<=<), when)
 
 import Distribution.PackDeps.Types
 import Distribution.PackDeps.Util
+import qualified Distribution.Utils.ShortText as ShortText
 
 import Distribution.Package hiding (PackageName)
 import qualified Distribution.Package as D
@@ -175,9 +176,14 @@ getReverses (Newest newest) =
 
 getDescInfo :: GenericPackageDescription -> (DescInfo PackageName Version, License)
 getDescInfo gpd = (DescInfo
-    { diHaystack = toCaseFold $ pack $ unlines [author p, maintainer p, name]
+    { diHaystack =
+        toCaseFold $ pack $ unlines
+          [ ShortText.fromShortText $ author p
+          , ShortText.fromShortText $ maintainer p
+          , name
+          ]
     , diDeps = getDeps gpd
-    , diSynopsis = pack $ synopsis p
+    , diSynopsis = pack $ ShortText.fromShortText $ synopsis p
     }, License $ pack $ prettyShow $ license $ packageDescription gpd)
   where
     p = packageDescription gpd
