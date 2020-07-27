@@ -1,0 +1,22 @@
+name: Docker base image
+
+on:
+  push:
+    branches: [base]
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Log into Github registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push base Docker image
+        run: |
+          IMAGE_ID=docker.pkg.github.com/${{ github.repository }}/base:$GITHUB_SHA
+          docker build . -f base.Dockerfile --tag $IMAGE_ID
+          docker push $IMAGE_ID
+          echo Pushed new base image $IMAGE_ID

@@ -7,4 +7,5 @@ newest
 static/tmp/
 yesod-devel/
 .stack-work/
-/tarballs/
+tarballs/
+/packdeps-yesod/tmp

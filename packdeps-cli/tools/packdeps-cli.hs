@@ -4,7 +4,6 @@ import Control.Monad (forM_, foldM, when)
 import Control.Monad (liftM)
 import Data.Char (isSpace)
 import Data.List (foldl')
-import Data.Semigroup ((<>))
 import Distribution.PackDeps
 import Distribution.Package (PackageIdentifier (pkgName, pkgVersion), PackageName, unPackageName)
 import Distribution.Text (display)
@@ -12,6 +11,8 @@ import Distribution.Version (Version)
 import qualified Distribution.InstalledPackageInfo as IPI
 import System.Exit (exitFailure, exitSuccess)
 import System.Process (readProcess)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 
 import qualified Data.Map as Map
 import qualified Options.Applicative as O
@@ -77,7 +78,9 @@ updateWithGhcPkg :: Newest -> IO Newest
 updateWithGhcPkg newest = do
     output <- readProcess "ghc-pkg" ["dump"] ""
     ipis <- either (fail . show) (return . map snd) $
-        traverse IPI.parseInstalledPackageInfo $ splitPkgs output
+        traverse IPI.parseInstalledPackageInfo $
+        map (encodeUtf8 . T.pack) $
+        splitPkgs output
     return $ foldl' apply newest $ map toPackInfo ipis
   where
     apply :: Newest -> (PackageName, PackInfo) -> Newest

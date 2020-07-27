@@ -1,0 +1,29 @@
+name: Docker image
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Log into Github registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
+
+      - name: Build image
+        run: docker build . --tag image
+
+      - name: Push to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login --username snoyberg --password-stdin
+          IMAGE_ID=snoyberg/packdeps:latest
+          docker tag image $IMAGE_ID
+          docker push $IMAGE_ID
+          IMAGE_ID=snoyberg/packdeps:$GITHUB_SHA
+          docker tag image $IMAGE_ID
+          docker push $IMAGE_ID

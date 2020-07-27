@@ -48,6 +48,8 @@ import Distribution.Parsec (Parsec, lexemeParsec, runParsecParser, simpleParsec)
 import Distribution.Parsec.FieldLineStream (fieldLineStreamFromBS)
 import Distribution.Types.CondTree
 import Distribution.Version
+import Distribution.Utils.ShortText
+import qualified Distribution.Utils.ShortText as ShortText
 import qualified Distribution.Fields as F
 import qualified Distribution.Fields.Field as F
 import qualified Distribution.Simple.Utils as U
@@ -204,19 +206,22 @@ getReverses newest =
 
 -- | Information on a single package.
 data DescInfo = DescInfo
-    { diHaystack :: String
+    { diHaystack :: ShortText
     , diDeps     :: [Dependency]
     , diLibDeps  :: [Dependency]
     , diPackage  :: PackageIdentifier
     , diRevision :: Int
-    , diSynopsis :: String
+    , diSynopsis :: ShortText
     }
     deriving (Show, Read)
 
 -- | Return revision and DescInfo
 getDescInfo :: GenericPackageDescription -> DescInfo
 getDescInfo gpd = DescInfo
-    { diHaystack = map toLower $ author p ++ maintainer p ++ name
+    { diHaystack = ShortText.toShortText $
+                   map toLower $
+                   ShortText.fromShortText $
+                   author p <> maintainer p <> ShortText.toShortText name
     , diDeps     = getDeps gpd
     , diLibDeps  = getLibDeps gpd
     , diPackage  = pi'
@@ -329,8 +334,8 @@ filterPackages needle =
   where
     needle' = map toLower needle
     go PackInfo { piDesc = Just desc } =
-        if needle' `isInfixOf` diHaystack desc &&
-           not ("(deprecated)" `isInfixOf` diSynopsis desc)
+        if needle' `isInfixOf` ShortText.fromShortText (diHaystack desc) &&
+           not ("(deprecated)" `isInfixOf` ShortText.fromShortText (diSynopsis desc))
             then Just desc
             else Nothing
     go _ = Nothing
