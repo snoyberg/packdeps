@@ -15,9 +15,15 @@ jobs:
       - name: Log into Github registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login docker.pkg.github.com -u ${{ github.actor }} --password-stdin
 
-      - name: Build and push Docker image
+      - name: Build image
+        run: docker build . --tag image
+
+      - name: Push to Docker Hub
         run: |
-          IMAGE_ID=docker.pkg.github.com/${{ github.repository }}/web:$GITHUB_SHA
-          docker build . --tag $IMAGE_ID
+          echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login --username snoyberg --password-stdin
+          IMAGE_ID=snoyberg/packdeps:latest
+          docker tag image $IMAGE_ID
           docker push $IMAGE_ID
-          echo Pushed new image $IMAGE_ID
+          IMAGE_ID=snoyberg/packdeps:$GITHUB_SHA
+          docker tag image $IMAGE_ID
+          docker push $IMAGE_ID
