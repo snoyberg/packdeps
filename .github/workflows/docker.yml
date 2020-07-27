@@ -18,6 +18,6 @@ jobs:
       - name: Build and push Docker image
         run: |
           IMAGE_ID=docker.pkg.github.com/${{ github.repository }}/web:$GITHUB_SHA
-          docker build base-run --tag $IMAGE_ID
+          docker build . --tag $IMAGE_ID
           docker push $IMAGE_ID
           echo Pushed new image $IMAGE_ID
