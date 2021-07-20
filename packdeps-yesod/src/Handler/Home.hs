@@ -11,7 +11,6 @@ import Distribution.PackDeps
     , checkDeps, getPackage
     , Outdated
     )
-import Data.Monoid ((<>))
 import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import Data.Time (getCurrentTime, UTCTime)
@@ -85,8 +84,9 @@ feed2Helper needle deps = do
         }
 
 getFeed3R :: Text -> Text -> Text -> Text -> Handler ()
-getFeed3R _ package _ _ =
-    redirect $ "http://hackage.haskell.org/package/" <> package
+getFeed3R needle _ _ _ = do
+    let feedR = (FeedR, [("needle", needle)])
+    redirect feedR
 
 getSpecificR :: Handler Html
 getSpecificR = do
