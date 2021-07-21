@@ -2,7 +2,7 @@ name: Docker image
 
 on:
   push:
-    branches: [master]
+    branches: [web]
   pull_request:
 
 jobs:
