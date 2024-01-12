@@ -9,5 +9,8 @@ FROM fpco/pid1:18.04
 COPY --from=build /artifacts/packdeps-server /usr/local/bin/
 COPY --from=build /src/packdeps-yesod/config/settings.yml /app/config/settings.yml
 COPY --from=build /src/packdeps-yesod/static /app/static
+
+RUN apt install wget -y
+
 WORKDIR /app
 CMD ["/usr/local/bin/packdeps-server", "production"]
