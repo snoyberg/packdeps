@@ -1,4 +1,4 @@
-FROM docker.pkg.github.com/snoyberg/packdeps/base:5fa3d2479b9204a321cd12642817902ef32143f2 as build
+FROM ghcr.io/snoyberg/packdeps/base:5fa3d2479b9204a321cd12642817902ef32143f2 as build
 
 RUN rm -rf /src
 COPY . /src
