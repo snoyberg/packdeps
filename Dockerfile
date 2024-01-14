@@ -10,7 +10,7 @@ COPY --from=build /artifacts/packdeps-server /usr/local/bin/
 COPY --from=build /src/packdeps-yesod/config/settings.yml /app/config/settings.yml
 COPY --from=build /src/packdeps-yesod/static /app/static
 
-RUN apt install wget -y
+RUN apt-get install wget -y
 
 WORKDIR /app
 CMD ["/usr/local/bin/packdeps-server", "production"]
