@@ -33,7 +33,7 @@ module Distribution.PackDeps
 
 import Control.Applicative as A ((<$>))
 import Control.Monad (guard)
-import System.Directory (getAppUserDataDirectory, doesFileExist)
+import qualified System.Directory as D
 import System.FilePath ((</>))
 import qualified Data.Map.Strict as Map
 import Data.List (foldl', group, sort, isInfixOf)
@@ -71,17 +71,32 @@ import Text.Read (readMaybe)
 import System.Environment (lookupEnv)
 -- import Data.Monoid ((<>))
 
+tryEnvVar :: String -> (String -> String) -> IO String -> IO String
+tryEnvVar name f d = lookupEnv name >>= maybe d (return . f)
+
+getDefaultDir :: D.XdgDirectory -> FilePath -> IO FilePath
+getDefaultDir xdg subdir =
+    tryEnvVar "CABAL_DIR" (</> subdir) $ do
+    defaultDir <- D.getAppUserDataDirectory "cabal"
+    dotCabalExists <- D.doesDirectoryExist defaultDir
+    xdgCfg <- D.getXdgDirectory D.XdgConfig ("cabal" </> "config")
+    xdgCfgExists <- D.doesFileExist xdgCfg
+    if dotCabalExists && not xdgCfgExists
+        then return $ defaultDir </> subdir
+        else D.getXdgDirectory xdg $ "cabal" </> subdir
+
 loadNewest :: Bool -> IO Newest
 loadNewest preferred = do
-    c <- getAppUserDataDirectory "cabal"
-    location <- fmap (fromMaybe (c </> "config")) (lookupEnv "CABAL_CONFIG")
+    cacheDir <- getDefaultDir D.XdgCache "packages"
+    location <- tryEnvVar "CABAL_CONFIG" id $
+                getDefaultDir D.XdgConfig "config"
 
     cfg' <- S.readFile location
     cfg <- either (fail . show) return $ F.readFields cfg'
     let repos        = reposFromConfig cfg
         repoCache    = case lookupInConfig "remote-repo-cache" cfg of
-            []        -> c </> "packages"  -- Default
-            (rrc : _) -> rrc               -- User-specified
+            []        -> cacheDir  -- Default
+            (rrc : _) -> rrc       -- User-specified
         tarNames repo = [ pfx </> "01-index.tar", pfx </> "00-index.tar" ]
           where pfx = repoCache </> repo
     fmap (Map.unionsWith maxVersion) . mapM (loadNewestFrom preferred . tarNames) $ repos
@@ -90,7 +105,7 @@ loadNewest preferred = do
 loadNewestFrom :: Bool -> [FilePath] -> IO Newest
 loadNewestFrom _ []         = fail "loadNewestFrom: no index tarball"
 loadNewestFrom preferred (fp : fps) = do
-    e <- doesFileExist fp
+    e <- D.doesFileExist fp
     if e
         then fmap (parseNewest preferred) (L.readFile fp)
         else loadNewestFrom preferred fps
