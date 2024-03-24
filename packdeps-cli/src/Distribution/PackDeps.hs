@@ -4,7 +4,7 @@ module Distribution.PackDeps
     ( -- * Data types
       Newest
     , CheckDepsRes (..)
-    , DescInfo
+    , DescInfo (..)
       -- * Read package database
     , loadNewest
     , loadNewestFrom
@@ -28,7 +28,6 @@ module Distribution.PackDeps
       -- * Internal
     , PackInfo (..)
     , piRevision
-    , DescInfo (..)
     ) where
 
 import Control.Applicative as A ((<$>))
