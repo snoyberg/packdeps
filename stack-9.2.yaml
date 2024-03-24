@@ -1,0 +1,4 @@
+resolver: lts-20.26
+packages:
+- packdeps-cli
+- packdeps-yesod

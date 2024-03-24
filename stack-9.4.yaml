@@ -1,0 +1,4 @@
+resolver: lts-21.25
+packages:
+- packdeps-cli
+- packdeps-yesod
