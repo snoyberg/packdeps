@@ -4,7 +4,6 @@ import Import
 import Distribution.PackDeps.Types
 import Text.Lucius (luciusFile)
 import qualified Data.Map as Map
-import Data.Monoid ((<>))
 import Data.IORef (readIORef)
 import qualified Data.Set as Set
 
