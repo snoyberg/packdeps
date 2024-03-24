@@ -1,3 +1,4 @@
+cabal-version:     >= 1.10
 name:              packdeps-yesod
 version:           0.0.0
 license:           BSD3
@@ -8,7 +9,6 @@ synopsis:          The greatest Yesod web application ever.
 description:       I'm sure you can say something clever here if you try.
 category:          Web
 stability:         Experimental
-cabal-version:     >= 1.8
 build-type:        Simple
 homepage:          http://packdeps.yesodweb.com/
 
@@ -40,7 +40,9 @@ library
     else
         ghc-options:   -Wall -threaded -O2
 
-    extensions: TemplateHaskell
+    default-language: Haskell2010
+    default-extensions:
+                TemplateHaskell
                 QuasiQuotes
                 OverloadedStrings
                 NoImplicitPrelude
@@ -101,4 +103,5 @@ executable         packdeps-server
     build-depends:     base
                      , packdeps-yesod
                      , yesod
-    ghc-options:   -Wall -threaded -O2
+    ghc-options:       -Wall -threaded -O2
+    default-language:  Haskell2010
