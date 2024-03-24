@@ -41,7 +41,7 @@ executable             packdeps
 
     build-depends:   base
                    , Cabal
-                   , optparse-applicative      >=0.14 && <0.17
+                   , optparse-applicative      >=0.14
                    , containers
                    , semigroups
                    , process
