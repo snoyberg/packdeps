@@ -50,12 +50,11 @@ import qualified Distribution.Utils.ShortText as ShortText
 
 import Distribution.Package hiding (PackageName)
 import qualified Distribution.Package as D
-import Distribution.PackageDescription
+import Distribution.PackageDescription hiding (PackageName)
 import Distribution.PackageDescription.Parsec
 import Distribution.Pretty (prettyShow)
-import Distribution.Types.CondTree (CondBranch (..))
 import qualified Distribution.Version as D
-import Distribution.Text hiding (Text)
+import Distribution.Text
 
 import qualified Data.Text as TS
 import qualified Data.ByteString.Lazy as L
@@ -247,7 +246,7 @@ getDeps gpd = HMap.map (fmap convertVersionRange)
 
     checkCond' _ (Var (OS _)) = True
     checkCond' _ (Var (Arch _)) = True
-    checkCond' flagMap (Var (Flag f)) = fromMaybe False $ Map.lookup f flagMap
+    checkCond' flagMap (Var (PackageFlag f)) = fromMaybe False $ Map.lookup f flagMap
     checkCond' _ (Var (Impl _compiler _range)) = True
     checkCond' _ (Lit b) = b
     checkCond' flagMap (CNot c) = not $ checkCond' flagMap c

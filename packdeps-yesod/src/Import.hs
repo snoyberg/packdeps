@@ -7,9 +7,6 @@ module Import
     , module Data.Monoid
     , module Control.Applicative
     , Text
-#if __GLASGOW_HASKELL__ < 704
-    , (<>)
-#endif
     , isDeep
     , getDeps
     , getData
@@ -37,12 +34,6 @@ import Data.List (sortBy)
 import Distribution.PackDeps.Types (PackageName (PackageName), Version)
 import Distribution.Types.PackageName (unPackageName)
 import Data.IORef (readIORef)
-
-#if __GLASGOW_HASKELL__ < 704
-infixr 5 <>
-(<>) :: Monoid m => m -> m -> m
-(<>) = mappend
-#endif
 
 isDeep :: Handler Bool
 isDeep = fmap (== Just "on") $ runInputGet $ iopt textField "deep"

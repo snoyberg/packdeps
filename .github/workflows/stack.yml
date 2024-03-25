@@ -1,0 +1,53 @@
+name: Stack build
+
+on:
+  push:
+    branches: [web]
+  pull_request:
+    branches: [web]
+
+jobs:
+  build:
+    name: Stack ${{ matrix.ghc }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ghc: ['9.8', '9.6', '9.4', '9.2', '9.0']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: haskell-actions/setup@v2
+      id: setup
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        enable-stack: true
+        cabal-update: false
+
+    - name: Restore cache
+      uses: actions/cache/restore@v4
+      id: cache
+      env:
+        key: ${{ runner.os }}-stack-${{ steps.setup.outputs.stack-version }}-ghc-${{ steps.setup.outputs.ghc-version }}
+      with:
+        path: |
+          ${{ steps.setup.outputs.stack-root }}
+          .stack-work
+        key: ${{ env.key }}-commit-${{ github.sha }}
+        restore-keys: ${{ env.key }}-
+
+    - name: Build dependencies
+      run:  stack build --stack-yaml=stack-${{ matrix.ghc }}.yaml --system-ghc --only-dependencies
+
+    - name: Build
+      run:  stack build --stack-yaml=stack-${{ matrix.ghc }}.yaml --system-ghc
+
+    - name: Save cache
+      uses: actions/cache/save@v4
+      if: always()
+      with:
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+        path: |
+          ${{ steps.setup.outputs.stack-root }}
+          .stack-work

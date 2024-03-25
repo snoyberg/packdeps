@@ -1,4 +1,4 @@
-resolver: lts-21.25
+resolver: nightly-2024-03-24
 packages:
 - packdeps-cli
 - packdeps-yesod

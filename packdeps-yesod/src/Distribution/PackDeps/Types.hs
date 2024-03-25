@@ -8,7 +8,6 @@ import GHC.Generics
 import Distribution.Text (display)
 import qualified Distribution.Types.PackageName as D
 import qualified Distribution.Version as D
-import qualified Distribution.Types.VersionRange.Internal as D
 import Data.Vector ((!))
 
 import Data.Binary (Binary (..), putWord8, getWord8, Put, Get)
@@ -187,7 +186,6 @@ newestToIds (Newest newest) =
     goVR (WildcardVersion v) = WildcardVersion <$> getVersion v
     goVR (UnionVersionRanges x y) = UnionVersionRanges <$> goVR x <*> goVR y
     goVR (IntersectVersionRanges x y) = IntersectVersionRanges <$> goVR x <*> goVR y
-    goVR (VersionRangeParens x) = VersionRangeParens <$> goVR x
     goVR (MajorBoundVersion x) = MajorBoundVersion <$> getVersion x
     goVR (OrLaterVersion x) = OrLaterVersion <$> getVersion x
     goVR (OrEarlierVersion x) = OrEarlierVersion <$> getVersion x
@@ -220,7 +218,6 @@ newestFromIds (NewestIds nameV versionV licenseV pairs) =
     goVR (WildcardVersion v) = WildcardVersion $ getVersion v
     goVR (UnionVersionRanges x y) = UnionVersionRanges (goVR x) (goVR y)
     goVR (IntersectVersionRanges x y) = IntersectVersionRanges (goVR x) (goVR y)
-    goVR (VersionRangeParens x) = VersionRangeParens (goVR x)
     goVR (MajorBoundVersion v) = MajorBoundVersion $ getVersion v
     goVR (OrLaterVersion v) = OrLaterVersion $ getVersion v
     goVR (OrEarlierVersion v) = OrEarlierVersion $ getVersion v
@@ -274,9 +271,9 @@ data PUVersionRange vr = PUVersionRange
     }
     deriving Generic
 instance Semigroup (PUVersionRange D.VersionRange) where
-    PUVersionRange a x <> PUVersionRange b y = PUVersionRange (mappend a b) (D.simplifyVersionRange $ D.IntersectVersionRanges x y)
+    PUVersionRange a x <> PUVersionRange b y = PUVersionRange (mappend a b) (D.simplifyVersionRange $ D.intersectVersionRanges x y)
 instance Monoid (PUVersionRange D.VersionRange) where
-    mempty = PUVersionRange mempty D.AnyVersion
+    mempty = PUVersionRange mempty D.anyVersion
     mappend = (<>)
 instance Functor PUVersionRange where
     fmap f (PUVersionRange x y) = PUVersionRange x (f y)
@@ -291,7 +288,6 @@ data VersionRange version
   | WildcardVersion        !version -- == ver.*   (same as >= ver && < ver+1)
   | UnionVersionRanges     !(VersionRange version) !(VersionRange version)
   | IntersectVersionRanges !(VersionRange version) !(VersionRange version)
-  | VersionRangeParens     !(VersionRange version) -- just '(exp)' parentheses syntax
   | MajorBoundVersion      !version -- ^>= version
   | OrLaterVersion         !version -- >= version
   | OrEarlierVersion       !version -- <= version
@@ -333,17 +329,16 @@ instance Show (VersionRange Version) where
     show =
         display . unVR
       where
-        unVR AnyVersion = D.AnyVersion
-        unVR (ThisVersion v) = D.ThisVersion (unV v)
-        unVR (LaterVersion v) = D.LaterVersion (unV v)
-        unVR (EarlierVersion v) = D.EarlierVersion (unV v)
-        unVR (WildcardVersion v) = D.WildcardVersion (unV v)
-        unVR (UnionVersionRanges x y) = D.UnionVersionRanges (unVR x) (unVR y)
-        unVR (IntersectVersionRanges x y) = D.IntersectVersionRanges (unVR x) (unVR y)
-        unVR (VersionRangeParens x) = D.VersionRangeParens (unVR x)
-        unVR (MajorBoundVersion v) = D.MajorBoundVersion (unV v)
-        unVR (OrLaterVersion v) = D.OrLaterVersion (unV v)
-        unVR (OrEarlierVersion v) = D.OrEarlierVersion (unV v)
+        unVR AnyVersion = D.anyVersion
+        unVR (ThisVersion v) = D.thisVersion (unV v)
+        unVR (LaterVersion v) = D.laterVersion (unV v)
+        unVR (EarlierVersion v) = D.earlierVersion (unV v)
+        unVR (WildcardVersion v) = D.withinVersion (unV v)
+        unVR (UnionVersionRanges x y) = D.unionVersionRanges (unVR x) (unVR y)
+        unVR (IntersectVersionRanges x y) = D.intersectVersionRanges (unVR x) (unVR y)
+        unVR (MajorBoundVersion v) = D.majorBoundVersion (unV v)
+        unVR (OrLaterVersion v) = D.orLaterVersion (unV v)
+        unVR (OrEarlierVersion v) = D.orEarlierVersion (unV v)
 
         unV (Version x) = x
 

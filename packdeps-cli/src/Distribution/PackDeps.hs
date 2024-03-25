@@ -4,7 +4,7 @@ module Distribution.PackDeps
     ( -- * Data types
       Newest
     , CheckDepsRes (..)
-    , DescInfo
+    , DescInfo (..)
       -- * Read package database
     , loadNewest
     , loadNewestFrom
@@ -28,7 +28,6 @@ module Distribution.PackDeps
       -- * Internal
     , PackInfo (..)
     , piRevision
-    , DescInfo (..)
     ) where
 
 import Control.Applicative as A ((<$>))
@@ -46,7 +45,6 @@ import Distribution.PackageDescription
 import Distribution.PackageDescription.Parsec
 import Distribution.Parsec (Parsec, lexemeParsec, runParsecParser, simpleParsec)
 import Distribution.Parsec.FieldLineStream (fieldLineStreamFromBS)
-import Distribution.Types.CondTree
 import Distribution.Version
 import Distribution.Utils.ShortText
 import qualified Distribution.Utils.ShortText as ShortText
@@ -252,7 +250,9 @@ getLibDeps gpd = maybe [] condTreeConstraints' (condLibrary gpd) ++ customDeps
 
     -- we only interested in Cabal default upper bound
     -- See cabal-install Distribution.Client.ProjectPlanning defaultSetupDeps
-    defSetupDeps = [Dependency (mkPackageName "Cabal") (earlierVersion $ mkVersion [1,25]) mempty]
+    defSetupDeps = [Dependency (mkPackageName "Cabal") (earlierVersion $ mkVersion [1,25])
+                               mainLibSet
+                   ]
 
 condTreeConstraints' :: Monoid c => CondTree ConfVar c a  -> c
 condTreeConstraints' = go where
@@ -265,7 +265,7 @@ condTreeConstraints' = go where
 notFlagCondition :: Condition ConfVar -> Bool
 notFlagCondition (Var (OS _))     = True
 notFlagCondition (Var (Arch _))   = True
-notFlagCondition (Var (Flag _))   = False
+notFlagCondition (Var (PackageFlag _)) = False
 notFlagCondition (Var (Impl _ _)) = True
 notFlagCondition (Lit _)          = True
 notFlagCondition (CNot a)         = notFlagCondition a
